@@ -1003,8 +1003,8 @@ body {
 
 .code-editor-wrapper {
   flex: 1;
+  min-height: 0;
   overflow: hidden;
-  height: 100%;
 }
 
 /* CodeMirror overrides to look dark & premium */
@@ -1069,6 +1069,7 @@ body {
 
 .terminal-console {
   flex: 1;
+  min-height: 0;
   padding: 16px;
   overflow-y: auto;
   font-family: var(--font-mono);
