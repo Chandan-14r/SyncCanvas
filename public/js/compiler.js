@@ -109,6 +109,18 @@ export function initCompiler(provider, ydoc, quill, docId) {
   // 5. Code Execution Controls
   const runBtn = document.getElementById('compiler-run-btn');
   const terminalConsole = document.getElementById('terminal-console');
+  const stdinContainer = document.getElementById('stdin-container');
+  const stdinWarningMsg = document.getElementById('stdin-warning-msg');
+  const stdinTextarea = document.getElementById('compiler-stdin');
+
+  function clearStdinWarning() {
+    if (stdinContainer) stdinContainer.classList.remove('warning-highlight');
+    if (stdinWarningMsg) stdinWarningMsg.style.display = 'none';
+  }
+
+  // Clear validation styling when user types or changes language
+  stdinTextarea?.addEventListener('input', clearStdinWarning);
+  languageDropdown?.addEventListener('change', clearStdinWarning);
   
   runBtn.addEventListener('click', async () => {
     const code = editor.getValue();
@@ -119,11 +131,31 @@ export function initCompiler(provider, ydoc, quill, docId) {
       return;
     }
 
+    const stdinValue = stdinTextarea?.value || '';
+
+    // Pre-run Stdin Validation Heuristics
+    if (!stdinValue.trim() && detectStdinExpectation(code, activeLang)) {
+      if (stdinContainer) {
+        stdinContainer.classList.add('warning-highlight');
+      }
+      if (stdinWarningMsg) {
+        stdinWarningMsg.style.display = 'inline';
+      }
+      stdinTextarea?.focus();
+      
+      showTerminalOutput(
+        '', 
+        '⚠️ Execution Bypassed: This code expects input, but the Program Input panel is empty.\n\nPlease enter inputs (e.g. 153) in the Program Input panel on the right, then run again.', 
+        'warning-info'
+      );
+      return;
+    }
+
     setTerminalRunning(true);
+    clearStdinWarning();
     
     try {
       let result;
-      const stdinValue = document.getElementById('compiler-stdin')?.value || '';
       if (activeLang === 'javascript') {
         result = await executeJavaScriptSandboxed(code, stdinValue);
       } else {
@@ -171,10 +203,51 @@ export function initCompiler(provider, ydoc, quill, docId) {
       pre.textContent = stdout || 'Script completed successfully with empty output buffer.';
       terminalConsole.appendChild(pre);
     } else if (type === 'stderr') {
-      const pre = document.createElement('pre');
-      pre.className = 'terminal-stderr';
-      pre.textContent = stderr || 'Compilation / Runtime execution failed.';
-      terminalConsole.appendChild(pre);
+      const isEofError = /EOFError|EndOfStream|EOF when reading|ios_base::failure/i.test(stderr);
+      
+      if (isEofError) {
+        const friendlyDiv = document.createElement('div');
+        friendlyDiv.style.background = 'rgba(239, 68, 68, 0.05)';
+        friendlyDiv.style.border = '1px solid rgba(239, 68, 68, 0.15)';
+        friendlyDiv.style.padding = '12px';
+        friendlyDiv.style.borderRadius = '8px';
+        friendlyDiv.style.marginBottom = '12px';
+        friendlyDiv.style.lineHeight = '1.5';
+        friendlyDiv.innerHTML = `
+          <strong style="color: #ef4444; display: block; margin-bottom: 4px;">⚠️ Execution Crashed (Missing Inputs)</strong>
+          <span>Your code attempted to read from standard input (stdin), but the Program Input panel was empty.</span>
+          <div style="margin-top: 8px; color: var(--text-secondary); font-size: 0.8rem;">
+            <strong>Tip:</strong> Type your input values inside the <strong>Program Input (stdin)</strong> panel on the right, and click <strong>Run Code</strong> again.
+          </div>
+          <button class="terminal-clear" style="margin-top: 12px; text-decoration: underline; display: block; font-weight: 500;" onclick="document.getElementById('raw-traceback').style.display='block'; this.style.display='none';">Show Technical Traceback</button>
+        `;
+        terminalConsole.appendChild(friendlyDiv);
+
+        const pre = document.createElement('pre');
+        pre.id = 'raw-traceback';
+        pre.className = 'terminal-stderr';
+        pre.style.display = 'none';
+        pre.style.marginTop = '8px';
+        pre.style.fontSize = '0.8rem';
+        pre.textContent = stderr || 'Compilation / Runtime execution failed.';
+        terminalConsole.appendChild(pre);
+      } else {
+        const pre = document.createElement('pre');
+        pre.className = 'terminal-stderr';
+        pre.textContent = stderr || 'Compilation / Runtime execution failed.';
+        terminalConsole.appendChild(pre);
+      }
+    } else if (type === 'warning-info') {
+      const div = document.createElement('div');
+      div.className = 'terminal-stderr';
+      div.style.color = '#f59e0b';
+      div.style.background = 'rgba(245, 158, 11, 0.05)';
+      div.style.padding = '12px';
+      div.style.borderRadius = '8px';
+      div.style.border = '1px solid rgba(245, 158, 11, 0.1)';
+      div.style.whiteSpace = 'pre-wrap';
+      div.textContent = stderr;
+      terminalConsole.appendChild(div);
     } else {
       const div = document.createElement('div');
       div.className = 'terminal-info';
@@ -424,5 +497,28 @@ async function executeRemoteCompiler(code, language, stdin = '') {
         ? 'Connection Timeout: Wandbox compiler proxy did not respond in 16 seconds.'
         : `Execution Connection Failed: ${err.message}`
     };
+  }
+}
+
+/**
+ * Lightweight helper to detect if a source code string likely expects standard inputs.
+ */
+function detectStdinExpectation(code, language) {
+  if (!code) return false;
+  // Remove comments (single line // and multi-line /* */) to avoid false positives
+  const cleanCode = code.replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, '');
+
+  switch (language) {
+    case 'python':
+      return /input\s*\(|sys\.stdin/.test(cleanCode);
+    case 'cpp':
+    case 'c':
+      return /std::cin|cin\s*>>|scanf\s*\(|gets\s*\(|fgets\s*\(\s*[a-zA-Z0-9_]+,\s*[a-zA-Z0-9_]+,\s*stdin\)/.test(cleanCode);
+    case 'csharp':
+      return /Console\.ReadLine|Console\.Read/.test(cleanCode);
+    case 'javascript':
+      return /prompt\s*\(|readline|process\.stdin/.test(cleanCode);
+    default:
+      return false;
   }
 }

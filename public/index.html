@@ -146,11 +146,15 @@
         <!-- Compiler Right Pane (Inputs & Outputs) -->
         <div class="compiler-right-pane">
           <!-- Program Input Pane -->
-          <div class="compiler-input-container">
+          <div class="compiler-input-container" id="stdin-container">
             <div class="input-header">
               <span>Program Input (stdin)</span>
             </div>
-            <textarea class="stdin-console" id="compiler-stdin" placeholder="Enter standard inputs here. Separate multiple inputs with newlines."></textarea>
+            <textarea class="stdin-console" id="compiler-stdin" placeholder="This is where you enter stdin values for programs using input(), cin, or prompt-like input. Example: 153"></textarea>
+            <div class="input-footer">
+              <span class="stdin-helper-text">Used only for programs that require user input.</span>
+              <span class="input-helper-msg" id="stdin-warning-msg" style="display: none;">⚠️ Input required for this program.</span>
+            </div>
           </div>
 
           <!-- Terminal Output Pane -->
