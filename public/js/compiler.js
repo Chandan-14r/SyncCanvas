@@ -19,6 +19,7 @@ let ydocRef = null;
 let currentObserveFn = null;
 let currentChangeFn = null;
 let currentTextObject = null;
+let ytestcases = null;
 
 /**
  * Helper to determine file icon matching extension
@@ -188,6 +189,58 @@ export function initCompiler(provider, ydoc, quill, docId) {
 
     selectFile(cleanName);
   });
+
+  // 7.5 Setup test cases synchronization & UI tabs
+  ytestcases = ydoc.getArray('test_cases');
+
+  const tabTerminalStd = document.getElementById('tab-terminal-std');
+  const tabTestCases = document.getElementById('tab-test-cases');
+  const paneTerminalStd = document.getElementById('pane-standard-terminal');
+  const paneTestCases = document.getElementById('pane-test-cases');
+
+  if (tabTerminalStd && tabTestCases && paneTerminalStd && paneTestCases) {
+    tabTerminalStd.addEventListener('click', () => {
+      tabTerminalStd.classList.add('active');
+      tabTestCases.classList.remove('active');
+      paneTerminalStd.style.display = 'flex';
+      paneTestCases.style.display = 'none';
+    });
+
+    tabTestCases.addEventListener('click', () => {
+      tabTestCases.classList.add('active');
+      tabTerminalStd.classList.remove('active');
+      paneTestCases.style.display = 'flex';
+      paneTerminalStd.style.display = 'none';
+      renderTestCases();
+    });
+  }
+
+  // Observe remote test cases updates
+  ytestcases.observeDeep(() => {
+    renderTestCases();
+  });
+
+  const addTestCaseBtn = document.getElementById('btn-add-testcase');
+  if (addTestCaseBtn) {
+    addTestCaseBtn.addEventListener('click', () => {
+      const newId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : Math.random().toString(36).substring(2);
+      const caseMap = new Y.Map();
+      caseMap.set('id', newId);
+      caseMap.set('input', '');
+      caseMap.set('expected', '');
+      ydoc.transact(() => {
+        ytestcases.push([caseMap]);
+      });
+      showToast('Added new test case', 'success', 2000);
+    });
+  }
+
+  const runTestcasesBtn = document.getElementById('btn-run-testcases');
+  if (runTestcasesBtn) {
+    runTestcasesBtn.addEventListener('click', runTestCaseSuite);
+  }
+
+  renderTestCases();
 
   // 8. Code Execution Controls
   const runBtn = document.getElementById('compiler-run-btn');
@@ -1264,4 +1317,203 @@ function getTerminalInputs(prompts, isMultiLine = false) {
 
     renderNextPrompt();
   });
+}
+
+/**
+ * Render test cases to pane-test-cases list container
+ */
+function renderTestCases() {
+  const listContainer = document.getElementById('test-cases-list');
+  if (!listContainer) return;
+  listContainer.innerHTML = '';
+
+  if (!ytestcases || ytestcases.length === 0) {
+    listContainer.innerHTML = '<div class="empty-state">No test cases configured yet. Click "Add Test Case" to get started!</div>';
+    return;
+  }
+
+  const testCasesArray = Array.from(ytestcases);
+  testCasesArray.forEach((caseMap, index) => {
+    const id = caseMap.get('id');
+    const input = caseMap.get('input') || '';
+    const expected = caseMap.get('expected') || '';
+
+    const card = document.createElement('div');
+    card.className = 'test-case-card';
+    card.dataset.id = id;
+
+    card.innerHTML = `
+      <div class="test-case-card-header">
+        <span>🧪 Test Case <span class="test-case-num">#${index + 1}</span></span>
+        <button class="file-action-btn btn-delete-testcase" title="Delete Test Case">🗑️</button>
+      </div>
+      <div class="test-case-card-body">
+        <div class="test-case-field">
+          <span class="test-case-input-label">Stdin Input</span>
+          <textarea class="test-case-textarea tc-input" placeholder="Type input values...">${escapeHtml(input)}</textarea>
+        </div>
+        <div class="test-case-field">
+          <span class="test-case-input-label">Expected Output</span>
+          <textarea class="test-case-textarea tc-expected" placeholder="Type expected output...">${escapeHtml(expected)}</textarea>
+        </div>
+      </div>
+    `;
+
+    const inputArea = card.querySelector('.tc-input');
+    const expectedArea = card.querySelector('.tc-expected');
+
+    inputArea.addEventListener('input', () => {
+      caseMap.set('input', inputArea.value);
+    });
+
+    expectedArea.addEventListener('input', () => {
+      caseMap.set('expected', expectedArea.value);
+    });
+
+    const delBtn = card.querySelector('.btn-delete-testcase');
+    delBtn.addEventListener('click', () => {
+      deleteTestCase(id);
+    });
+
+    listContainer.appendChild(card);
+  });
+}
+
+/**
+ * Delete a test case
+ */
+function deleteTestCase(id) {
+  if (!ytestcases) return;
+  let indexToRemove = -1;
+  for (let i = 0; i < ytestcases.length; i++) {
+    if (ytestcases.get(i).get('id') === id) {
+      indexToRemove = i;
+      break;
+    }
+  }
+  if (indexToRemove !== -1) {
+    ydocRef.transact(() => {
+      ytestcases.delete(indexToRemove, 1);
+    });
+    showToast('Deleted test case', 'info', 2000);
+  }
+}
+
+/**
+ * Execute all test cases concurrently and display comparative results
+ */
+async function runTestCaseSuite() {
+  const runTestcasesBtn = document.getElementById('btn-run-testcases');
+  const resultsPanel = document.getElementById('test-results-panel');
+  if (!resultsPanel || !ytestcases) return;
+
+  if (ytestcases.length === 0) {
+    showToast('Please add at least one test case.', 'warning');
+    return;
+  }
+
+  const code = editorInstance ? editorInstance.getValue() : '';
+  const activeLang = document.getElementById('compiler-language').value;
+
+  if (!code || !code.trim()) {
+    showToast('No code script to run.', 'warning');
+    return;
+  }
+
+  runTestcasesBtn.disabled = true;
+  runTestcasesBtn.innerHTML = '🧪 Running Tests...';
+  resultsPanel.innerHTML = '<div class="terminal-info">Compiling script and running test cases concurrently...</div>';
+
+  try {
+    // Package workspace files for compilation
+    const filesPayload = [];
+    yfiles.forEach((ytext, filename) => {
+      filesPayload.push({
+        name: filename,
+        content: filename === activeFile ? code : ytext.toString()
+      });
+    });
+
+    // Sort activeFile to the front
+    const activeIdx = filesPayload.findIndex(f => f.name === activeFile);
+    if (activeIdx !== -1) {
+      const [activeFileObj] = filesPayload.splice(activeIdx, 1);
+      filesPayload.unshift(activeFileObj);
+    }
+
+    const testCasesArray = Array.from(ytestcases);
+    const promises = testCasesArray.map(async (caseMap, index) => {
+      const stdinVal = caseMap.get('input') || '';
+      const expectedVal = caseMap.get('expected') || '';
+
+      let result;
+      if (activeLang === 'javascript') {
+        result = await executeJavaScriptSandboxed(code, stdinVal);
+      } else {
+        result = await executeRemoteCompilerMultiFile(filesPayload, activeLang, stdinVal);
+      }
+
+      const actualVal = result.success ? result.stdout : (result.stderr || result.error || 'Execution Error');
+      
+      const cleanActual = actualVal.replace(/\r\n/g, '\n').trim();
+      const cleanExpected = expectedVal.replace(/\r\n/g, '\n').trim();
+      const passed = cleanActual === cleanExpected && result.success;
+
+      return {
+        index: index + 1,
+        passed,
+        stdin: stdinVal,
+        expected: expectedVal,
+        actual: actualVal,
+        error: !result.success
+      };
+    });
+
+    const results = await Promise.all(promises);
+
+    resultsPanel.innerHTML = '';
+    const passedCount = results.filter(r => r.passed).length;
+    const allPassed = passedCount === results.length;
+
+    const summaryBadge = document.createElement('div');
+    summaryBadge.className = `test-results-summary-badge ${allPassed ? 'all-passed' : 'some-failed'}`;
+    summaryBadge.textContent = allPassed 
+      ? `🎉 ALL PASSED (${passedCount}/${results.length} Test Cases)`
+      : `⚠️ SOME FAILED (${passedCount}/${results.length} Passed, ${results.length - passedCount} Failed)`;
+    resultsPanel.appendChild(summaryBadge);
+
+    results.forEach(res => {
+      const card = document.createElement('div');
+      card.className = `test-result-card ${res.passed ? 'passed' : 'failed'}`;
+
+      card.innerHTML = `
+        <div class="test-result-header">
+          <span>Test Case #${res.index}</span>
+          <span class="${res.passed ? 'status-passed' : 'status-failed'}">${res.passed ? 'Passed ✅' : 'Failed ❌'}</span>
+        </div>
+        <div class="test-result-details">
+          <div class="test-result-val-box">
+            <span class="test-result-label">Program Input (stdin)</span>
+            <pre class="test-result-pre">${escapeHtml(res.stdin) || '<i>None</i>'}</pre>
+          </div>
+          <div class="test-result-val-box">
+            <span class="test-result-label">Expected Output</span>
+            <pre class="test-result-pre">${escapeHtml(res.expected) || '<i>None</i>'}</pre>
+          </div>
+          <div class="test-result-val-box">
+            <span class="test-result-label">Actual Output</span>
+            <pre class="test-result-pre" style="color: ${res.passed ? '#10b981' : '#ef4444'};">${escapeHtml(res.actual) || '<i>None</i>'}</pre>
+          </div>
+        </div>
+      `;
+      resultsPanel.appendChild(card);
+    });
+
+  } catch (err) {
+    console.error('Test execution suite failed:', err);
+    resultsPanel.innerHTML = `<div class="terminal-stderr">Execution suite error: ${err.message}</div>`;
+  } finally {
+    runTestcasesBtn.disabled = false;
+    runTestcasesBtn.innerHTML = '🧪 Run Test Cases';
+  }
 }

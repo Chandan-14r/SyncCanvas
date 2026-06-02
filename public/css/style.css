@@ -1581,6 +1581,274 @@ body {
   background: rgba(239, 68, 68, 0.6);
 }
 
+/* ==========================================================================
+   SyncCanvas — LeetCode-style Test Cases and Right-Pane Tabs
+   ========================================================================== */
+.compiler-right-pane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.right-pane-tabs {
+  display: flex;
+  background: rgba(10, 14, 23, 0.2);
+  border-bottom: var(--border-glass);
+  flex-shrink: 0;
+}
+
+.right-pane-tab {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border-bottom: 2px solid transparent;
+  outline: none;
+}
+
+.right-pane-tab:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.right-pane-tab.active {
+  color: var(--color-accent);
+  border-bottom: 2px solid var(--color-accent);
+  background: rgba(10, 14, 23, 0.4);
+}
+
+.right-tab-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  gap: 16px;
+}
+
+/* Tab pane specific layouts */
+#pane-standard-terminal {
+  gap: 16px;
+  padding-top: 12px;
+}
+
+#pane-test-cases {
+  padding: 12px 0 0 0;
+}
+
+.test-cases-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.test-cases-list-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 4px;
+}
+
+.test-cases-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: 16px;
+}
+
+.test-case-card {
+  background: rgba(17, 24, 39, 0.4);
+  border: var(--border-glass);
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.test-case-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.test-case-num {
+  color: var(--color-accent);
+}
+
+.test-case-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+@media (min-width: 1024px) {
+  .test-case-card-body {
+    flex-direction: row;
+    gap: 12px;
+  }
+}
+
+.test-case-field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.test-case-input-label {
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.test-case-textarea {
+  background: rgba(0, 0, 0, 0.25);
+  border: var(--border-glass);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  padding: 6px 8px;
+  border-radius: 6px;
+  resize: vertical;
+  outline: none;
+  min-height: 50px;
+  transition: border-color var(--transition-fast);
+}
+
+.test-case-textarea:focus {
+  border-color: var(--color-accent);
+}
+
+/* Results panel styles */
+.test-results-container {
+  max-height: 250px;
+  overflow-y: auto;
+  border-top: var(--border-glass);
+  padding: 12px 0;
+  flex-shrink: 0;
+  background: rgba(10, 14, 23, 0.3);
+}
+
+.test-results-container:empty {
+  display: none;
+}
+
+.test-result-card {
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: fadeIn 0.25s ease-out;
+}
+
+.test-result-card.passed {
+  border-color: rgba(16, 185, 129, 0.3);
+  background: rgba(16, 185, 129, 0.06);
+}
+
+.test-result-card.failed {
+  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.06);
+}
+
+.test-result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.test-result-header .status-passed {
+  color: #10b981;
+}
+
+.test-result-header .status-failed {
+  color: #ef4444;
+}
+
+.test-result-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+@media (min-width: 1024px) {
+  .test-result-details {
+    flex-direction: row;
+    gap: 12px;
+  }
+}
+
+.test-result-val-box {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.test-result-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.test-result-pre {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0;
+  color: var(--text-primary);
+  max-height: 100px;
+  overflow-y: auto;
+}
+
+.test-results-summary-badge {
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.95rem;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.test-results-summary-badge.all-passed {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.test-results-summary-badge.some-failed {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+
 
 
 

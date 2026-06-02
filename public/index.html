@@ -160,26 +160,53 @@
 
         <!-- Compiler Right Pane (Inputs & Outputs) -->
         <div class="compiler-right-pane">
-          <!-- Program Input Pane -->
-          <div class="compiler-input-container" id="stdin-container">
-            <div class="input-header">
-              <span>Program Input (stdin)</span>
+          <!-- Right Pane Tab Switcher -->
+          <div class="right-pane-tabs" id="compiler-right-tabs">
+            <button class="right-pane-tab active" id="tab-terminal-std">💻 Standard Terminal</button>
+            <button class="right-pane-tab" id="tab-test-cases">🧪 Test Cases Suite</button>
+          </div>
+
+          <!-- Tab Pane: Standard Terminal -->
+          <div class="right-tab-pane" id="pane-standard-terminal">
+            <!-- Program Input Pane -->
+            <div class="compiler-input-container" id="stdin-container">
+              <div class="input-header">
+                <span>Program Input (stdin)</span>
+              </div>
+              <textarea class="stdin-console" id="compiler-stdin" placeholder="This is where you enter stdin values for programs using input(), cin, or prompt-like input. Example: 153"></textarea>
+              <div class="input-footer">
+                <span class="stdin-helper-text">Used only for programs that require user input.</span>
+                <span class="input-helper-msg" id="stdin-warning-msg" style="display: none;">⚠️ Input required for this program.</span>
+              </div>
             </div>
-            <textarea class="stdin-console" id="compiler-stdin" placeholder="This is where you enter stdin values for programs using input(), cin, or prompt-like input. Example: 153"></textarea>
-            <div class="input-footer">
-              <span class="stdin-helper-text">Used only for programs that require user input.</span>
-              <span class="input-helper-msg" id="stdin-warning-msg" style="display: none;">⚠️ Input required for this program.</span>
+
+            <!-- Terminal Output Pane -->
+            <div class="compiler-terminal-container">
+              <div class="terminal-header">
+                <span>Terminal Output</span>
+                <button class="terminal-clear" id="terminal-clear-btn">Clear Logs</button>
+              </div>
+              <div class="terminal-console" id="terminal-console">
+                <div class="terminal-placeholder">Click "Run Code" to compile and execute your script. Logs will appear here...</div>
+              </div>
             </div>
           </div>
 
-          <!-- Terminal Output Pane -->
-          <div class="compiler-terminal-container">
-            <div class="terminal-header">
-              <span>Terminal Output</span>
-              <button class="terminal-clear" id="terminal-clear-btn">Clear Logs</button>
+          <!-- Tab Pane: Test Cases Suite -->
+          <div class="right-tab-pane" id="pane-test-cases" style="display: none;">
+            <div class="test-cases-toolbar">
+              <button class="btn btn-secondary" id="btn-add-testcase">➕ Add Test Case</button>
+              <button class="btn btn-primary" id="btn-run-testcases">🧪 Run Test Cases</button>
             </div>
-            <div class="terminal-console" id="terminal-console">
-              <div class="terminal-placeholder">Click "Run Code" to compile and execute your script. Logs will appear here...</div>
+            
+            <div class="test-cases-list-wrapper">
+              <div class="test-cases-list" id="test-cases-list">
+                <!-- Dynamically populated test cases -->
+              </div>
+            </div>
+
+            <div class="test-results-container" id="test-results-panel">
+              <!-- Dynamically populated execution results -->
             </div>
           </div>
         </div>
