@@ -201,7 +201,7 @@ function initWorkspaceTabs(quill) {
   tabPlainText.addEventListener('click', () => {
     tabPlainText.classList.add('active');
     tabCodeCompiler.classList.remove('active');
-    notepadWorkspace.style.display = 'block';
+    notepadWorkspace.style.display = 'flex';
     compilerWorkspace.style.display = 'none';
     if (quill) {
       quill.update();
@@ -212,7 +212,7 @@ function initWorkspaceTabs(quill) {
     tabCodeCompiler.classList.add('active');
     tabPlainText.classList.remove('active');
     notepadWorkspace.style.display = 'none';
-    compilerWorkspace.style.display = 'block';
+    compilerWorkspace.style.display = 'flex';
     if (window.codeMirrorInstance) {
       window.codeMirrorInstance.refresh();
     }
