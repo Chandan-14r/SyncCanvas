@@ -85,18 +85,19 @@ body {
 
 /* Scrollbars */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 5px;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--text-muted);
-  border-radius: 4px;
+  background: rgba(156, 163, 175, 0.5) !important;
+  border-radius: 5px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-secondary);
+  background: rgba(156, 163, 175, 0.8) !important;
 }
 
 /* --- Top Navigation Bar --- */
@@ -356,8 +357,28 @@ body {
   flex: 1;
   padding: 24px 32px !important;
   line-height: 1.625 !important;
-  overflow-y: auto;
+  overflow-y: auto !important;
   color: var(--text-primary) !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(156, 163, 175, 0.5) transparent !important;
+}
+
+/* Force scrollbar to render inside ql-editor container */
+.ql-editor::-webkit-scrollbar {
+  width: 10px !important;
+  height: 10px !important;
+  display: block !important;
+}
+.ql-editor::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05) !important;
+  border-radius: 5px !important;
+}
+.ql-editor::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.5) !important;
+  border-radius: 5px !important;
+}
+.ql-editor::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.8) !important;
 }
 
 /* Toolbar Buttons & Styles */
@@ -1313,13 +1334,35 @@ body {
 }
 
 /* --- Inline Terminal Prompt Styles --- */
-.terminal-prompt-line {
+.terminal-prompt-container {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   font-family: var(--font-mono);
   font-size: 0.85rem;
   color: #fff;
-  margin-bottom: 6px;
+  margin-bottom: 12px;
+  width: 100%;
+}
+
+.terminal-prompt-label {
+  line-height: 1.4;
+  word-break: break-word;
+  color: #3b82f6;
+  font-weight: bold;
+}
+
+.terminal-input-wrapper {
+  display: flex;
+  align-items: center;
+  margin-top: 4px;
+  width: 100%;
+}
+
+.terminal-prompt-char {
+  color: #10b981;
+  margin-right: 8px;
+  font-weight: bold;
+  user-select: none;
 }
 
 .terminal-inline-input {
@@ -1330,8 +1373,8 @@ body {
   font-family: var(--font-mono) !important;
   font-size: 0.85rem !important;
   padding: 0 !important;
-  margin-left: 6px !important;
   flex: 1 !important;
+  min-width: 0 !important;
   caret-color: #3b82f6; /* Blue cursor */
 }
 

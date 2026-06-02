@@ -718,26 +718,43 @@ function getTerminalInputs(prompts, isMultiLine = false) {
     let currentPromptIndex = 0;
 
     function renderNextPrompt() {
-      const promptDiv = document.createElement('div');
-      promptDiv.className = 'terminal-prompt-line';
+      const containerDiv = document.createElement('div');
+      containerDiv.className = 'terminal-prompt-container';
 
-      const label = document.createElement('span');
+      const label = document.createElement('div');
+      label.className = 'terminal-prompt-label';
       label.style.color = '#3b82f6';
       label.style.fontWeight = 'bold';
       
       if (isMultiLine) {
-        label.textContent = `[stdin required] Enter line ${inputs.length + 1} (leave empty and press Enter to run): `;
+        label.textContent = `[stdin required] Enter line ${inputs.length + 1} (leave empty and press Enter to run):`;
       } else {
         label.textContent = prompts[currentPromptIndex];
       }
-      promptDiv.appendChild(label);
+      containerDiv.appendChild(label);
+
+      const inputWrapper = document.createElement('div');
+      inputWrapper.className = 'terminal-input-wrapper';
+      inputWrapper.style.display = 'flex';
+      inputWrapper.style.alignItems = 'center';
+      inputWrapper.style.marginTop = '4px';
+
+      const promptChar = document.createElement('span');
+      promptChar.className = 'terminal-prompt-char';
+      promptChar.style.color = '#10b981';
+      promptChar.style.marginRight = '8px';
+      promptChar.style.fontWeight = 'bold';
+      promptChar.textContent = '>';
+      inputWrapper.appendChild(promptChar);
 
       const input = document.createElement('input');
       input.type = 'text';
       input.className = 'terminal-inline-input';
-      promptDiv.appendChild(input);
+      inputWrapper.appendChild(input);
 
-      terminalConsole.appendChild(promptDiv);
+      containerDiv.appendChild(inputWrapper);
+      terminalConsole.appendChild(containerDiv);
+      
       terminalConsole.scrollTop = terminalConsole.scrollHeight;
       input.focus();
 
@@ -755,11 +772,11 @@ function getTerminalInputs(prompts, isMultiLine = false) {
           const val = input.value;
           
           // Replace input element with static text
-          promptDiv.removeChild(input);
+          inputWrapper.removeChild(input);
           const valSpan = document.createElement('span');
           valSpan.style.color = '#10b981';
           valSpan.textContent = val;
-          promptDiv.appendChild(valSpan);
+          inputWrapper.appendChild(valSpan);
 
           if (isMultiLine) {
             if (val === '') {
