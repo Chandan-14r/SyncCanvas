@@ -103,6 +103,7 @@
   <div class="workspace-tabs-container" id="workspace-tabs" hidden>
     <button class="workspace-tab active" id="tab-plain-text">📝 Plain Text</button>
     <button class="workspace-tab" id="tab-code-compiler">💻 Code Compiler</button>
+    <button class="workspace-tab" id="tab-whiteboard">🎨 Whiteboard</button>
   </div>
 
   <!-- Main Work Space -->
@@ -212,6 +213,55 @@
               <!-- Dynamically populated execution results -->
             </div>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Collaborative SVG Whiteboard Section -->
+    <section class="editor-section" id="whiteboard-workspace" style="display: none;">
+      <div class="whiteboard-layout">
+        <!-- Whiteboard Floating Toolbar -->
+        <div class="whiteboard-toolbar">
+          <button class="wb-tool-btn active" id="wb-tool-select" title="Select / Move Shape (🖱️)">🖱️ Select</button>
+          <button class="wb-tool-btn" id="wb-tool-pencil" title="Free Draw / Pencil (✏️)">✏️ Pencil</button>
+          <button class="wb-tool-btn" id="wb-tool-rect" title="Draw Rectangle (🟩)">🟩 Rect</button>
+          <button class="wb-tool-btn" id="wb-tool-circle" title="Draw Circle (⭕)">⭕ Circle</button>
+          <button class="wb-tool-btn" id="wb-tool-line" title="Draw Line (➖)">➖ Line</button>
+          <div class="wb-toolbar-divider"></div>
+          <div class="wb-control-group">
+            <label for="wb-stroke-color">Color</label>
+            <input type="color" id="wb-stroke-color" value="#3b82f6" title="Stroke Color">
+          </div>
+          <div class="wb-control-group">
+            <label for="wb-stroke-width">Width</label>
+            <select class="wb-select" id="wb-stroke-width" title="Stroke Width">
+              <option value="2" selected>2px</option>
+              <option value="4">4px</option>
+              <option value="6">6px</option>
+              <option value="8">8px</option>
+            </select>
+          </div>
+          <div class="wb-toolbar-divider"></div>
+          <button class="wb-action-btn btn-danger" id="wb-btn-delete" title="Delete Selected Shape (Delete / Backspace)" disabled>🗑️ Delete</button>
+          <button class="wb-action-btn btn-ghost" id="wb-btn-clear" title="Clear Canvas">🧹 Clear Board</button>
+        </div>
+        <!-- SVG Drawing Viewport -->
+        <div class="whiteboard-canvas-wrapper">
+          <svg id="whiteboard-canvas" width="100%" height="100%">
+            <defs>
+              <pattern id="grid-pattern" width="20" height="20" patternUnits="userSpaceOnUse">
+                <circle cx="2" cy="2" r="1" fill="var(--border-primary)" />
+              </pattern>
+            </defs>
+            <!-- Grid Background Rect -->
+            <rect width="100%" height="100%" fill="url(#grid-pattern)" />
+            
+            <!-- Drawing Shapes Container -->
+            <g id="wb-shapes-group"></g>
+            
+            <!-- Remote Cursors Container -->
+            <g id="wb-cursors-group"></g>
+          </svg>
         </div>
       </div>
     </section>

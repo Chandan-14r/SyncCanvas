@@ -5,6 +5,7 @@ import { initOffline } from './offline.js';
 import { initRollbackUI } from './rollback-ui.js';
 import { initDebugPanel } from './debug.js';
 import { initCompiler } from './compiler.js';
+import { initWhiteboard } from './whiteboard.js';
 
 // --- URL Router ---
 // Parse location.pathname to get the document ID directly from the path (e.g. /my-custom-name).
@@ -180,6 +181,9 @@ async function init() {
   // Initialize Collaborative Code Compiler
   initCompiler(provider, ydoc, quill, docId);
 
+  // Initialize Collaborative Whiteboard
+  initWhiteboard(provider, ydoc, docId);
+
   // Initialize Workspace Tab Switcher
   initWorkspaceTabs(quill);
 }
@@ -189,33 +193,37 @@ function initWorkspaceTabs(quill) {
   const tabsContainer = document.getElementById('workspace-tabs');
   const tabPlainText = document.getElementById('tab-plain-text');
   const tabCodeCompiler = document.getElementById('tab-code-compiler');
+  const tabWhiteboard = document.getElementById('tab-whiteboard');
   
   const notepadWorkspace = document.getElementById('notepad-workspace');
   const compilerWorkspace = document.getElementById('compiler-workspace');
+  const whiteboardWorkspace = document.getElementById('whiteboard-workspace');
 
-  if (!tabsContainer || !tabPlainText || !tabCodeCompiler || !notepadWorkspace || !compilerWorkspace) return;
+  if (!tabsContainer || !tabPlainText || !tabCodeCompiler || !tabWhiteboard ||
+      !notepadWorkspace || !compilerWorkspace || !whiteboardWorkspace) return;
 
   // Show tabs container
   tabsContainer.hidden = false;
 
-  tabPlainText.addEventListener('click', () => {
-    tabPlainText.classList.add('active');
-    tabCodeCompiler.classList.remove('active');
-    notepadWorkspace.style.display = 'flex';
-    compilerWorkspace.style.display = 'none';
-    if (quill) {
-      quill.update();
-    }
-  });
+  const tabs = [
+    { button: tabPlainText, pane: notepadWorkspace, onSelect: () => quill && quill.update() },
+    { button: tabCodeCompiler, pane: compilerWorkspace, onSelect: () => window.codeMirrorInstance && window.codeMirrorInstance.refresh() },
+    { button: tabWhiteboard, pane: whiteboardWorkspace, onSelect: () => {} }
+  ];
 
-  tabCodeCompiler.addEventListener('click', () => {
-    tabCodeCompiler.classList.add('active');
-    tabPlainText.classList.remove('active');
-    notepadWorkspace.style.display = 'none';
-    compilerWorkspace.style.display = 'flex';
-    if (window.codeMirrorInstance) {
-      window.codeMirrorInstance.refresh();
-    }
+  tabs.forEach(tabItem => {
+    tabItem.button.addEventListener('click', () => {
+      tabs.forEach(item => {
+        if (item === tabItem) {
+          item.button.classList.add('active');
+          item.pane.style.display = 'flex';
+          item.onSelect();
+        } else {
+          item.button.classList.remove('active');
+          item.pane.style.display = 'none';
+        }
+      });
+    });
   });
 }
 

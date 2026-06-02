@@ -1894,6 +1894,176 @@ body {
   box-shadow: 0 2px 4px rgba(0,0,0,0.2);
 }
 
+/* ==========================================================================
+   Collaborative Whiteboard (Excalidraw-lite) Styles
+   ========================================================================== */
+
+:root {
+  --border-primary: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="light"] {
+  --border-primary: rgba(0, 0, 0, 0.08);
+}
+
+.whiteboard-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  border: var(--border-glass);
+  background: var(--bg-surface-opaque);
+  box-shadow: var(--glass-shadow);
+}
+
+.whiteboard-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: var(--bg-card);
+  backdrop-filter: var(--glass-blur);
+  border-bottom: var(--border-glass);
+  flex-wrap: wrap;
+  z-index: 10;
+}
+
+.wb-tool-btn, .wb-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  font-weight: 500;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.wb-tool-btn:hover, .wb-action-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+.wb-tool-btn.active {
+  background: var(--color-accent);
+  color: #fff;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
+}
+
+.wb-toolbar-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--border-color);
+  margin: 0 4px;
+}
+
+.wb-control-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.wb-control-group input[type="color"] {
+  -webkit-appearance: none;
+  border: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  cursor: pointer;
+  background: none;
+  padding: 0;
+}
+
+.wb-control-group input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.wb-control-group input[type="color"]::-webkit-color-swatch {
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+}
+
+.wb-select {
+  background: var(--bg-app);
+  border: var(--border-glass);
+  color: var(--text-primary);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  outline: none;
+  cursor: pointer;
+}
+
+.whiteboard-canvas-wrapper {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-app);
+}
+
+#whiteboard-canvas {
+  display: block;
+  user-select: none;
+  cursor: crosshair;
+  width: 100%;
+  height: 100%;
+}
+
+#whiteboard-canvas rect.wb-shape-element,
+#whiteboard-canvas circle.wb-shape-element,
+#whiteboard-canvas line.wb-shape-element,
+#whiteboard-canvas path.wb-shape-element {
+  cursor: pointer;
+  transition: stroke var(--transition-fast), stroke-width var(--transition-fast);
+}
+
+.wb-shape-element.selected {
+  stroke-dasharray: 4;
+  animation: wb-dash-rotate 20s linear infinite;
+  filter: drop-shadow(0 0 2px var(--color-accent));
+}
+
+@keyframes wb-dash-rotate {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: 400;
+  }
+}
+
+/* Remote Whiteboard Pointer */
+.wb-pointer {
+  pointer-events: none;
+  transition: transform 0.08s ease-out;
+}
+
+.wb-pointer-cursor {
+  fill: currentColor;
+  stroke: #fff;
+  stroke-width: 1px;
+}
+
+.wb-pointer-label {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
+  fill: #fff;
+}
+
+
 
 
 
