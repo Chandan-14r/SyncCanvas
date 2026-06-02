@@ -135,51 +135,42 @@ export function initCompiler(provider, ydoc, quill, docId) {
 
     // Interactive Stdin Prompt if empty and code expects input
     if (!stdinValue.trim() && detectStdinExpectation(code, activeLang)) {
-      const inputs = [];
-      let cancelled = false;
+      let inputs = null;
 
       if (activeLang === 'python') {
         const pythonPrompts = extractPythonPrompts(code);
         if (pythonPrompts.length > 0) {
-          for (let i = 0; i < pythonPrompts.length; i++) {
-            const val = prompt(`[Python Program Input Required]\n\n${pythonPrompts[i]}`);
-            if (val === null) {
-              cancelled = true;
-              break;
-            }
-            inputs.push(val);
-          }
+          inputs = await showCustomInputModal(pythonPrompts, 'Python Program Input Required');
         } else {
-          const val = prompt("[Python Program Input Required]\n\nThis code calls input(), but no stdin values were provided. Please enter input value(s):");
-          if (val === null) cancelled = true;
-          else inputs.push(val);
+          inputs = await showCustomInputModal(
+            ["This code calls input(), but no stdin values were provided. Please enter input value(s):"], 
+            'Python Program Input Required', 
+            true
+          );
         }
       } else if (activeLang === 'javascript') {
         const jsPrompts = extractJsPrompts(code);
         if (jsPrompts.length > 0) {
-          for (let i = 0; i < jsPrompts.length; i++) {
-            const val = prompt(`[JavaScript Program Input Required]\n\n${jsPrompts[i]}`);
-            if (val === null) {
-              cancelled = true;
-              break;
-            }
-            inputs.push(val);
-          }
+          inputs = await showCustomInputModal(jsPrompts, 'JavaScript Program Input Required');
         } else {
-          const val = prompt("[JavaScript Program Input Required]\n\nThis code calls prompt(), but no stdin values were provided. Please enter input value(s):");
-          if (val === null) cancelled = true;
-          else inputs.push(val);
+          inputs = await showCustomInputModal(
+            ["This code calls prompt(), but no stdin values were provided. Please enter input value(s):"], 
+            'JavaScript Program Input Required', 
+            true
+          );
         }
       } else {
         // C, C++, C#
         const langNames = { cpp: 'C++', c: 'C', csharp: 'C#' };
         const langName = langNames[activeLang] || activeLang;
-        const val = prompt(`[${langName} Program Input Required]\n\nThis program expects standard input (stdin). Please enter your input values (separate multiple inputs with newlines):`);
-        if (val === null) cancelled = true;
-        else inputs.push(val);
+        inputs = await showCustomInputModal(
+          [`This program expects standard input (stdin). Please enter your input values (separate multiple inputs with newlines):`], 
+          `${langName} Program Input Required`, 
+          true
+        );
       }
 
-      if (cancelled) {
+      if (inputs === null) {
         showTerminalOutput('', 'Execution Cancelled: Stdin inputs were not provided.', 'info');
         return;
       }
@@ -600,4 +591,109 @@ function detectStdinExpectation(code, language) {
     default:
       return false;
   }
+}
+
+/**
+ * Simple HTML escaping helper.
+ */
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+/**
+ * Dynamically displays a modern overlay modal to collect program inputs.
+ */
+function showCustomInputModal(prompts, title, isMultiLine = false) {
+  return new Promise((resolve) => {
+    const modal = document.createElement('div');
+    modal.className = 'custom-prompt-modal-overlay';
+    
+    let fieldsHtml = '';
+    if (isMultiLine) {
+      fieldsHtml = `
+        <div class="custom-prompt-field">
+          <label class="custom-prompt-label">${escapeHtml(prompts[0])}</label>
+          <textarea class="custom-prompt-textarea" id="prompt-input-area" placeholder="Enter input values here (separate multiple lines with newlines)..." rows="4"></textarea>
+        </div>
+      `;
+    } else {
+      prompts.forEach((promptText, index) => {
+        fieldsHtml += `
+          <div class="custom-prompt-field">
+            <label class="custom-prompt-label">${escapeHtml(promptText)}</label>
+            <input type="text" class="custom-prompt-input" id="prompt-input-${index}" autocomplete="off" required />
+          </div>
+        `;
+      });
+    }
+
+    modal.innerHTML = `
+      <div class="custom-prompt-card">
+        <div class="custom-prompt-header">
+          <span class="custom-prompt-title">⚡ ${escapeHtml(title)}</span>
+        </div>
+        <form id="custom-prompt-form">
+          <div class="custom-prompt-body">
+            ${fieldsHtml}
+          </div>
+          <div class="custom-prompt-actions">
+            <button type="submit" class="btn btn-primary">Submit Inputs</button>
+            <button type="button" class="btn btn-ghost" id="custom-prompt-cancel">Cancel</button>
+          </div>
+        </form>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const focusEl = isMultiLine ? modal.querySelector('#prompt-input-area') : modal.querySelector('#prompt-input-0');
+    if (focusEl) {
+      setTimeout(() => focusEl.focus(), 50);
+    }
+
+    const form = modal.querySelector('#custom-prompt-form');
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (isMultiLine) {
+        const value = modal.querySelector('#prompt-input-area').value;
+        cleanup();
+        resolve([value]);
+      } else {
+        const values = [];
+        prompts.forEach((_, index) => {
+          const inputVal = modal.querySelector(`#prompt-input-${index}`).value;
+          values.push(inputVal);
+        });
+        cleanup();
+        resolve(values);
+      }
+    });
+
+    const cancelBtn = modal.querySelector('#custom-prompt-cancel');
+    cancelBtn.addEventListener('click', () => {
+      cleanup();
+      resolve(null);
+    });
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        cleanup();
+        resolve(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    function cleanup() {
+      window.removeEventListener('keydown', handleKeyDown);
+      if (document.body.contains(modal)) {
+        document.body.removeChild(modal);
+      }
+    }
+  });
 }
