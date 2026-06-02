@@ -902,6 +902,7 @@ body {
 
 #compiler-workspace {
   padding: 0 !important;
+  padding-bottom: 44px !important;
   overflow: hidden !important;
   min-height: 0;
 }
@@ -1129,8 +1130,9 @@ body {
   display: none !important; /* Hidden in layout per user request */
 }
 
-.compiler-terminal-container {
-  height: 100% !important; /* Take up full right pane height */
+.compiler-right-pane > .compiler-terminal-container {
+  flex: 1;
+  min-height: 0;
 }
 
 .input-header {
