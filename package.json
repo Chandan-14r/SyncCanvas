@@ -1,0 +1,36 @@
+{
+  "name": "syncanvas",
+  "version": "1.0.0",
+  "description": "Real-time collaborative document editor with CRDT conflict resolution, offline-first architecture, and operational event logging",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js"
+  },
+  "keywords": [
+    "crdt",
+    "yjs",
+    "collaborative-editing",
+    "websocket",
+    "real-time",
+    "offline-first",
+    "quill"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "dompurify": "^3.1.6",
+    "express": "^4.21.0",
+    "mongodb": "^7.2.0",
+    "quill": "^1.3.7",
+    "quill-cursors": "^3.1.0",
+    "ws": "^8.18.0",
+    "y-indexeddb": "^9.0.12",
+    "y-quill": "^0.1.5",
+    "y-websocket": "^2.0.4",
+    "yjs": "^13.6.19"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^25.1.0"
+  }
+}

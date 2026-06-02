@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SyncCanvas — Real-Time Collaborative Editor</title>
+  <meta name="description" content="Production-grade real-time collaborative document editor with CRDT conflict resolution">
+  
+  <!-- Inline SVG Favicon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+  
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- Quill CSS (Served Locally) -->
+  <link href="/node_modules/quill/dist/quill.snow.css" rel="stylesheet">
+  
+  <!-- App CSS -->
+  <link rel="stylesheet" href="/css/style.css">
+  
+  <!-- Local Scripts (loaded as globals) -->
+  <script src="/node_modules/quill/dist/quill.js"></script>
+  <script src="/node_modules/quill-cursors/dist/quill-cursors.js"></script>
+  <script src="/node_modules/dompurify/dist/purify.min.js"></script>
+  
+  <!-- Import map for ES modules -->
+  <script type="importmap">
+  {
+    "imports": {
+      "yjs": "/node_modules/yjs/dist/yjs.mjs",
+      "y-websocket": "/node_modules/y-websocket/src/y-websocket.js",
+      "y-quill": "/node_modules/y-quill/src/y-quill.js",
+      "y-indexeddb": "/node_modules/y-indexeddb/src/y-indexeddb.js",
+      "lib0/": "/node_modules/lib0/",
+      "y-protocols/": "/node_modules/y-protocols/"
+    }
+  }
+  </script>
+</head>
+<body>
+
+  <!-- Homepage Room Selection Portal -->
+  <div class="portal-container" id="portal-container" hidden>
+    <div class="portal-card">
+      <h1 class="portal-logo">⚡ SyncCanvas</h1>
+      <p class="portal-tagline">Real-time collaborative notepad. Simple, fast, and instant.</p>
+      
+      <form class="portal-form" id="portal-form">
+        <!-- Room Address Input Group -->
+        <div class="portal-input-group">
+          <label class="portal-label" for="portal-room-input">Notepad Address</label>
+          <div class="portal-input-wrapper">
+            <span class="portal-prefix" id="portal-prefix">synccanvas/</span>
+            <input type="text" class="portal-input" id="portal-room-input" placeholder="enter-unique-name" autocomplete="off" required pattern="[a-zA-Z0-9\-]+" title="Letters, numbers, and hyphens only">
+          </div>
+        </div>
+
+        <!-- Username Input Group -->
+        <div class="portal-input-group">
+          <label class="portal-label" for="portal-username-input">Your Collaborator Name / Alias</label>
+          <div class="portal-input-wrapper">
+            <input type="text" class="portal-input" id="portal-username-input" placeholder="e.g. Alex, Sarah, Developer" autocomplete="off" required minlength="2" maxlength="25">
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary portal-btn">Login & Open Notepad</button>
+      </form>
+      
+      <div class="portal-footer">
+        <span>Type any custom URL path to instantly create or join a notepad room.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Top Navigation Bar -->
+  <header class="topbar" id="topbar">
+    <div class="topbar-left">
+      <span class="logo">⚡ SyncCanvas</span>
+      <span class="doc-id" id="doc-id">Loading document...</span>
+    </div>
+    <div class="topbar-right">
+      <div class="connection-badge" id="connection-badge">
+        <span class="connection-dot"></span>
+        <span class="connection-text">Connecting...</span>
+      </div>
+      <div class="user-count" id="user-count">1 user</div>
+      <button class="btn btn-ghost theme-toggle" id="theme-toggle" title="Toggle light/dark theme">
+        <span class="theme-icon">🌙</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Work Space -->
+  <main class="app-layout">
+    <!-- Quill Rich Text Editor Section -->
+    <section class="editor-section">
+      <div id="editor-container"></div>
+    </section>
+
+    <!-- Presence sidebar (right) -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <h3>Collaborators</h3>
+        <button class="btn btn-ghost sidebar-toggle" id="sidebar-toggle-close" title="Close sidebar">✕</button>
+      </div>
+      <ul class="user-list" id="user-list">
+        <!-- Live active users will be populated here -->
+      </ul>
+    </aside>
+  </main>
+
+  <!-- Bottom Drawer: History/Checkpoints -->
+  <div class="bottom-drawer" id="bottom-drawer">
+    <div class="drawer-header" id="drawer-toggle">
+      <span class="drawer-title">📋 Document Checkpoints & Rollback</span>
+      <span class="drawer-chevron">▲</span>
+    </div>
+    <div class="drawer-content" id="drawer-content">
+      <div class="checkpoint-list" id="checkpoint-list">
+        <!-- Dynamically rendered checkpoint items -->
+        <div class="empty-state">No checkpoints saved yet. Checkpoints are automatically generated as you type.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rollback Preview Overlay Modal -->
+  <div class="rollback-preview" id="rollback-preview" hidden>
+    <div class="preview-overlay"></div>
+    <div class="preview-modal">
+      <div class="preview-header">
+        <h3>Document Preview (Read-Only)</h3>
+        <span class="preview-timestamp" id="preview-timestamp">Checkpoint #...</span>
+      </div>
+      <div class="preview-content-wrapper">
+        <div class="preview-content" id="preview-content"></div>
+      </div>
+      <div class="preview-actions">
+        <button class="btn btn-danger" id="confirm-rollback">Restore to this checkpoint</button>
+        <button class="btn btn-ghost" id="cancel-rollback">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden Debug Panel (Triggered via Ctrl+Shift+D) -->
+  <div class="debug-panel" id="debug-panel" hidden>
+    <div class="debug-header">
+      <h3>🔧 Network Simulation Debug</h3>
+      <button class="btn btn-ghost" id="close-debug">✕</button>
+    </div>
+    <div class="debug-controls">
+      <div class="debug-control">
+        <label for="latency-slider">Latency Jitter: <span id="latency-value">0ms</span></label>
+        <input type="range" id="latency-slider" min="0" max="2000" value="0" step="50">
+      </div>
+      <div class="debug-control">
+        <label for="loss-slider">Packet Loss: <span id="loss-value">0%</span></label>
+        <input type="range" id="loss-slider" min="0" max="50" value="0">
+      </div>
+      <button class="btn btn-danger" id="kill-connection">Disconnect Socket</button>
+    </div>
+    <div class="debug-metrics" id="debug-metrics">
+      <div class="metric"><span>Connection Status</span><strong id="debug-conn-status">🟢 Online</strong></div>
+      <div class="metric"><span>Messages Sent</span><strong id="debug-msg-sent">0</strong></div>
+      <div class="metric"><span>Messages Dropped</span><strong id="debug-msg-dropped">0</strong></div>
+    </div>
+  </div>
+
+  <!-- Global Toast Notifications -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- Main Application Script (ES Module) -->
+  <script type="module" src="/js/app.js"></script>
+
+</body>
+</html>
