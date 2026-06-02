@@ -210,6 +210,33 @@ export function initCompiler(provider, ydoc, quill, docId) {
     });
   }
 
+  // 6.5 Download Code Control
+  const downloadBtn = document.getElementById('compiler-download-btn');
+  if (downloadBtn) {
+    downloadBtn.addEventListener('click', () => {
+      const codeText = window.codeMirrorInstance ? window.codeMirrorInstance.getValue() : '';
+      const activeLang = document.getElementById('compiler-language')?.value || 'javascript';
+      
+      let fileExt = 'js';
+      if (activeLang === 'python') fileExt = 'py';
+      else if (activeLang === 'cpp') fileExt = 'cpp';
+      else if (activeLang === 'c') fileExt = 'c';
+      else if (activeLang === 'csharp') fileExt = 'cs';
+
+      const blob = new Blob([codeText], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `code_${docId}.${fileExt}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      showToast(`Code downloaded successfully as code_${docId}.${fileExt}!`, 'success', 3000);
+    });
+  }
+
   // 7. Stdin Synchronization via Yjs
   const ystdin = ydoc.getText('stdin');
   const stdinTextarea = document.getElementById('compiler-stdin');
