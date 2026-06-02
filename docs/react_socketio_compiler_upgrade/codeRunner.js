@@ -162,13 +162,8 @@ function runJavaScriptSandboxed(code, stdin) {
       </html>
     `;
 
+    iframe.srcdoc = sandboxHtml;
     document.body.appendChild(iframe);
-    
-    // Write sandbox content directly to the iframe
-    const doc = iframe.contentDocument || iframe.contentWindow.document;
-    doc.open();
-    doc.write(sandboxHtml);
-    doc.close();
   });
 }
 

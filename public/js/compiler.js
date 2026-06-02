@@ -248,11 +248,8 @@ function executeJavaScriptSandboxed(code) {
       </html>
     `;
 
+    iframe.srcdoc = sandboxHtml;
     document.body.appendChild(iframe);
-    const doc = iframe.contentDocument || iframe.contentWindow.document;
-    doc.open();
-    doc.write(sandboxHtml);
-    doc.close();
   });
 }
 
