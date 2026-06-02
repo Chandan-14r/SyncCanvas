@@ -1,6 +1,6 @@
 import { showToast } from './app.js';
 
-const PISTON_API_URL = 'https://emkc.org/api/v2/piston';
+const PISTON_API_URL = 'https://emkc.org/api/v2/piston/execute';
 
 const LANGUAGE_CONFIGS = {
   python: { language: 'python', version: '3.10.0', mode: 'python' },

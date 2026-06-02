@@ -303,7 +303,7 @@ app.post('/api/compile', async (req, res) => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-    const response = await fetch('https://emkc.org/api/v2/piston', {
+    const response = await fetch('https://emkc.org/api/v2/piston/execute', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

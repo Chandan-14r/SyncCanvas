@@ -5,7 +5,7 @@
  * - Python / C++: Public Piston API coordination via proxy
  */
 
-const PISTON_API_URL = 'https://emkc.org/api/v2/piston';
+const PISTON_API_URL = 'https://emkc.org/api/v2/piston/execute';
 
 // Mapping local language names to Piston API version specifications
 const LANGUAGE_CONFIGS = {
