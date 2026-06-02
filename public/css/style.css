@@ -900,6 +900,11 @@ body {
    SyncCanvas — Collaborative Code Compiler Styles
    ========================================================================== */
 
+#compiler-workspace {
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
 /* Workspace Switcher Tabs */
 .workspace-tabs-container {
   display: flex;
@@ -1112,18 +1117,11 @@ body {
 }
 
 .compiler-input-container {
-  display: flex;
-  flex-direction: column;
-  background: #07090e;
-  border: var(--border-glass);
-  border-radius: 12px;
-  overflow: hidden;
-  box-shadow: var(--glass-shadow);
-  height: 50%;
+  display: none !important; /* Hidden in layout per user request */
 }
 
 .compiler-terminal-container {
-  height: 50% !important; /* Force equal split with input */
+  height: 100% !important; /* Take up full right pane height */
 }
 
 .input-header {
@@ -1294,6 +1292,29 @@ body {
   gap: 12px;
   background: rgba(255, 255, 255, 0.01);
   border-top: var(--border-glass);
+}
+
+/* --- Inline Terminal Prompt Styles --- */
+.terminal-prompt-line {
+  display: flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: #fff;
+  margin-bottom: 6px;
+}
+
+.terminal-inline-input {
+  background: transparent !important;
+  border: none !important;
+  color: #10b981 !important; /* Green text for typed input */
+  outline: none !important;
+  font-family: var(--font-mono) !important;
+  font-size: 0.85rem !important;
+  padding: 0 !important;
+  margin-left: 6px !important;
+  flex: 1 !important;
+  caret-color: #3b82f6; /* Blue cursor */
 }
 
 

@@ -131,31 +131,34 @@ export function initCompiler(provider, ydoc, quill, docId) {
       return;
     }
 
-    let stdinValue = stdinTextarea?.value || '';
+    let stdinValue = '';
 
-    // Interactive Stdin Prompt if empty and code expects input
-    if (!stdinValue.trim() && detectStdinExpectation(code, activeLang)) {
+    // Interactive Inline Terminal Prompt if code expects input
+    if (detectStdinExpectation(code, activeLang)) {
+      runBtn.disabled = true;
+      runBtn.innerHTML = `
+        <svg class="animate-spin" style="width:14px;height:14px;border:2px solid transparent;border-top-color:#fff;border-radius:50%;display:inline-block;" viewBox="0 0 24 24"></svg>
+        <span>Waiting for Input...</span>
+      `;
+
       let inputs = null;
-
       if (activeLang === 'python') {
         const pythonPrompts = extractPythonPrompts(code);
         if (pythonPrompts.length > 0) {
-          inputs = await showCustomInputModal(pythonPrompts, 'Python Program Input Required');
+          inputs = await getTerminalInputs(pythonPrompts, false);
         } else {
-          inputs = await showCustomInputModal(
-            ["This code calls input(), but no stdin values were provided. Please enter input value(s):"], 
-            'Python Program Input Required', 
+          inputs = await getTerminalInputs(
+            ["This Python code expects standard input. Please enter your values:"], 
             true
           );
         }
       } else if (activeLang === 'javascript') {
         const jsPrompts = extractJsPrompts(code);
         if (jsPrompts.length > 0) {
-          inputs = await showCustomInputModal(jsPrompts, 'JavaScript Program Input Required');
+          inputs = await getTerminalInputs(jsPrompts, false);
         } else {
-          inputs = await showCustomInputModal(
-            ["This code calls prompt(), but no stdin values were provided. Please enter input value(s):"], 
-            'JavaScript Program Input Required', 
+          inputs = await getTerminalInputs(
+            ["This JavaScript code expects standard input. Please enter your values:"], 
             true
           );
         }
@@ -163,12 +166,14 @@ export function initCompiler(provider, ydoc, quill, docId) {
         // C, C++, C#
         const langNames = { cpp: 'C++', c: 'C', csharp: 'C#' };
         const langName = langNames[activeLang] || activeLang;
-        inputs = await showCustomInputModal(
-          [`This program expects standard input (stdin). Please enter your input values (separate multiple inputs with newlines):`], 
-          `${langName} Program Input Required`, 
+        inputs = await getTerminalInputs(
+          [`This ${langName} program expects standard input (stdin).`], 
           true
         );
       }
+
+      runBtn.disabled = false;
+      runBtn.innerHTML = '⚡ Run Code';
 
       if (inputs === null) {
         showTerminalOutput('', 'Execution Cancelled: Stdin inputs were not provided.', 'info');
@@ -695,5 +700,91 @@ function showCustomInputModal(prompts, title, isMultiLine = false) {
         document.body.removeChild(modal);
       }
     }
+  });
+}
+
+/**
+ * Prompts the user inline inside the Terminal Console for standard inputs.
+ */
+function getTerminalInputs(prompts, isMultiLine = false) {
+  return new Promise((resolve) => {
+    const terminalConsole = document.getElementById('terminal-console');
+    if (!terminalConsole) return resolve(null);
+
+    // Clear logs for input collection
+    terminalConsole.innerHTML = '';
+
+    const inputs = [];
+    let currentPromptIndex = 0;
+
+    function renderNextPrompt() {
+      const promptDiv = document.createElement('div');
+      promptDiv.className = 'terminal-prompt-line';
+
+      const label = document.createElement('span');
+      label.style.color = '#3b82f6';
+      label.style.fontWeight = 'bold';
+      
+      if (isMultiLine) {
+        label.textContent = `[stdin required] Enter line ${inputs.length + 1} (leave empty and press Enter to run): `;
+      } else {
+        label.textContent = prompts[currentPromptIndex];
+      }
+      promptDiv.appendChild(label);
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'terminal-inline-input';
+      promptDiv.appendChild(input);
+
+      terminalConsole.appendChild(promptDiv);
+      terminalConsole.scrollTop = terminalConsole.scrollHeight;
+      input.focus();
+
+      // Ensure click on terminal re-focuses the input
+      const clickHandler = () => input.focus();
+      terminalConsole.addEventListener('click', clickHandler);
+
+      function cleanupListeners() {
+        terminalConsole.removeEventListener('click', clickHandler);
+      }
+
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          cleanupListeners();
+          const val = input.value;
+          
+          // Replace input element with static text
+          promptDiv.removeChild(input);
+          const valSpan = document.createElement('span');
+          valSpan.style.color = '#10b981';
+          valSpan.textContent = val;
+          promptDiv.appendChild(valSpan);
+
+          if (isMultiLine) {
+            if (val === '') {
+              // Pressing empty Enter ends multi-line collection
+              resolve(inputs);
+            } else {
+              inputs.push(val);
+              renderNextPrompt();
+            }
+          } else {
+            inputs.push(val);
+            currentPromptIndex++;
+            if (currentPromptIndex < prompts.length) {
+              renderNextPrompt();
+            } else {
+              resolve(inputs);
+            }
+          }
+        } else if (e.key === 'Escape') {
+          cleanupListeners();
+          resolve(null);
+        }
+      });
+    }
+
+    renderNextPrompt();
   });
 }
