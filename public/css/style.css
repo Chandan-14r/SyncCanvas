@@ -211,7 +211,7 @@ body {
 .app-layout {
   display: flex;
   flex: 1;
-  height: calc(100vh - var(--topbar-height));
+  min-height: 0;
   position: relative;
   overflow: hidden;
 }
@@ -903,6 +903,7 @@ body {
 #compiler-workspace {
   padding: 0 !important;
   overflow: hidden !important;
+  min-height: 0;
 }
 
 /* Workspace Switcher Tabs */
@@ -944,7 +945,8 @@ body {
 .compiler-layout {
   display: grid;
   grid-template-rows: 1.5fr 1fr;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   gap: 16px;
   padding: 16px;
 }
@@ -964,7 +966,7 @@ body {
   border-radius: 12px;
   overflow: hidden;
   box-shadow: var(--glass-shadow);
-  height: 100%;
+  min-height: 0;
 }
 
 .compiler-toolbar {
@@ -1005,11 +1007,17 @@ body {
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  position: relative;
 }
 
 /* CodeMirror overrides to look dark & premium */
 .CodeMirror {
-  height: 100% !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  height: auto !important;
   font-family: var(--font-mono) !important;
   font-size: 0.9rem !important;
   background: #0d1117 !important;
@@ -1038,7 +1046,7 @@ body {
   border-radius: 12px;
   overflow: hidden;
   box-shadow: var(--glass-shadow);
-  height: 100%;
+  min-height: 0;
 }
 
 .terminal-header {
@@ -1113,7 +1121,7 @@ body {
 .compiler-right-pane {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  min-height: 0;
   gap: 16px;
 }
 
