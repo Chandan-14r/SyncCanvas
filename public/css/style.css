@@ -76,7 +76,7 @@ body {
   font-family: var(--font-sans);
   background-color: var(--bg-app);
   color: var(--text-primary);
-  min-height: 100vh;
+  height: 100vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -222,8 +222,10 @@ body {
   flex-direction: column;
   background: var(--bg-app);
   padding: 24px;
-  overflow-y: auto;
+  padding-bottom: 68px; /* 24px normal + 44px for fixed bottom-drawer */
+  overflow: hidden;
   position: relative;
+  min-height: 0;
 }
 
 /* --- Sidebar --- */
@@ -325,6 +327,8 @@ body {
   box-shadow: var(--glass-shadow);
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -344,7 +348,7 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  min-height: 450px;
+  min-height: 0;
   color: var(--text-primary) !important;
 }
 
