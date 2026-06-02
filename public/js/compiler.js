@@ -312,7 +312,6 @@ export function initCompiler(provider, ydoc, quill, docId) {
 
   // 7. Stdin Synchronization via Yjs
   const ystdin = ydoc.getText('stdin');
-  const stdinTextarea = document.getElementById('compiler-stdin');
   if (stdinTextarea) {
     let isSettingStdin = false;
 
