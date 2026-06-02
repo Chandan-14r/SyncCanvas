@@ -127,6 +127,9 @@
                 <option value="cpp">C++ (GCC 10)</option>
                 <option value="csharp">C# (Mono 6.12)</option>
               </select>
+              <button class="btn btn-secondary" id="compiler-save-btn" title="Persist changes to DB">
+                💾 Save Code
+              </button>
               <button class="btn btn-primary" id="compiler-run-btn">
                 ⚡ Run Code
               </button>
@@ -137,14 +140,25 @@
           </div>
         </div>
 
-        <!-- Terminal Output Pane -->
-        <div class="compiler-terminal-container">
-          <div class="terminal-header">
-            <span>Terminal Output</span>
-            <button class="terminal-clear" id="terminal-clear-btn">Clear Logs</button>
+        <!-- Compiler Right Pane (Inputs & Outputs) -->
+        <div class="compiler-right-pane">
+          <!-- Program Input Pane -->
+          <div class="compiler-input-container">
+            <div class="input-header">
+              <span>Program Input (stdin)</span>
+            </div>
+            <textarea class="stdin-console" id="compiler-stdin" placeholder="Enter standard inputs here. Separate multiple inputs with newlines."></textarea>
           </div>
-          <div class="terminal-console" id="terminal-console">
-            <div class="terminal-placeholder">Click "Run Code" to compile and execute your script. Logs will appear here...</div>
+
+          <!-- Terminal Output Pane -->
+          <div class="compiler-terminal-container">
+            <div class="terminal-header">
+              <span>Terminal Output</span>
+              <button class="terminal-clear" id="terminal-clear-btn">Clear Logs</button>
+            </div>
+            <div class="terminal-console" id="terminal-console">
+              <div class="terminal-placeholder">Click "Run Code" to compile and execute your script. Logs will appear here...</div>
+            </div>
           </div>
         </div>
       </div>

@@ -1092,3 +1092,64 @@ body {
   font-style: italic;
 }
 
+/* Secondary Button (Save Code) */
+.btn-secondary {
+  background-color: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.btn-secondary:hover {
+  background-color: rgba(59, 130, 246, 0.2);
+}
+
+/* Compiler Layout Right Pane (Inputs + Outputs) */
+.compiler-right-pane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 16px;
+}
+
+.compiler-input-container {
+  display: flex;
+  flex-direction: column;
+  background: #07090e;
+  border: var(--border-glass);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--glass-shadow);
+  height: 50%;
+}
+
+.compiler-terminal-container {
+  height: 50% !important; /* Force equal split with input */
+}
+
+.input-header {
+  display: flex;
+  align-items: center;
+  padding: 10px 16px;
+  background: #0f141c;
+  border-bottom: var(--border-glass);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 600;
+  user-select: none;
+}
+
+.stdin-console {
+  flex: 1;
+  padding: 16px;
+  background: #030406;
+  color: #e2e8f0;
+  border: none;
+  outline: none;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  line-height: 1.6;
+  resize: none;
+}
+
+

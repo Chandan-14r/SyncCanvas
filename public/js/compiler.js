@@ -19,7 +19,7 @@ let editorInstance = null;
  * @param {object} ydoc - The shared Y.Doc document
  * @param {object} quill - The active Quill editor instance (for size refreshes)
  */
-export function initCompiler(provider, ydoc, quill) {
+export function initCompiler(provider, ydoc, quill, docId) {
   const codeTextarea = document.getElementById('code-textarea');
   if (!codeTextarea) return;
 
@@ -123,10 +123,11 @@ export function initCompiler(provider, ydoc, quill) {
     
     try {
       let result;
+      const stdinValue = document.getElementById('compiler-stdin')?.value || '';
       if (activeLang === 'javascript') {
-        result = await executeJavaScriptSandboxed(code);
+        result = await executeJavaScriptSandboxed(code, stdinValue);
       } else {
-        result = await executeRemoteCompiler(code, activeLang);
+        result = await executeRemoteCompiler(code, activeLang, stdinValue);
       }
 
       if (result.success) {
@@ -181,12 +182,67 @@ export function initCompiler(provider, ydoc, quill) {
       terminalConsole.appendChild(div);
     }
   }
+
+  // 6. Save Code Control
+  const saveBtn = document.getElementById('compiler-save-btn');
+  if (saveBtn) {
+    saveBtn.addEventListener('click', async () => {
+      saveBtn.disabled = true;
+      const originalText = saveBtn.innerHTML;
+      saveBtn.innerHTML = '💾 Saving...';
+      
+      try {
+        const response = await fetch(`/api/save-code/${docId}`, {
+          method: 'POST'
+        });
+        const data = await response.json();
+        if (data.ok) {
+          showToast('Code saved successfully to database!', 'success', 3000);
+        } else {
+          showToast(`Save failed: ${data.error}`, 'error', 4000);
+        }
+      } catch (err) {
+        showToast(`Save error: ${err.message}`, 'error', 4000);
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = originalText;
+      }
+    });
+  }
+
+  // 7. Stdin Synchronization via Yjs
+  const ystdin = ydoc.getText('stdin');
+  const stdinTextarea = document.getElementById('compiler-stdin');
+  if (stdinTextarea) {
+    let isSettingStdin = false;
+
+    // Local changes to Yjs
+    stdinTextarea.addEventListener('input', () => {
+      if (isSettingStdin) return;
+      const text = stdinTextarea.value;
+      ydoc.transact(() => {
+        ystdin.delete(0, ystdin.length);
+        ystdin.insert(0, text);
+      });
+    });
+
+    // Remote changes to textarea
+    ystdin.observe((event) => {
+      if (event.transaction.local) return;
+      isSettingStdin = true;
+      const val = ystdin.toString();
+      if (stdinTextarea.value !== val) {
+        stdinTextarea.value = val;
+      }
+      isSettingStdin = false;
+    });
+  }
 }
 
 /**
  * Execute JS inside a secure client iframe sandbox.
  */
-function executeJavaScriptSandboxed(code) {
+function executeJavaScriptSandboxed(code, stdin = '') {
   return new Promise((resolve) => {
     const iframe = document.createElement('iframe');
     iframe.style.display = 'none';
@@ -218,30 +274,51 @@ function executeJavaScriptSandboxed(code) {
     function cleanup() {
       clearTimeout(executionTimeout);
       window.removeEventListener('message', messageListener);
-      document.body.removeChild(iframe);
+      if (document.body.contains(iframe)) {
+        document.body.removeChild(iframe);
+      }
     }
+
+    const stdinLines = stdin ? stdin.split('\n') : [];
 
     const sandboxHtml = `
       <!DOCTYPE html>
       <html>
         <head>
           <script>
-            window.console.log = function(...args) {
-              const formatted = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' ');
-              window.parent.postMessage({ type: 'log', val: formatted }, '*');
-            };
-            window.onerror = function(message, source, lineno, colno, error) {
-              window.parent.postMessage({ type: 'error', error: message + ' (Line ' + lineno + ':' + colno + ')' }, '*');
-              return true;
-            };
-            window.onload = function() {
-              try {
-                (function() { ${code} })();
-                window.parent.postMessage({ type: 'done' }, '*');
-              } catch (err) {
-                window.parent.postMessage({ type: 'error', error: err.message }, '*');
-              }
-            };
+            (function() {
+              const stdinLines = ${JSON.stringify(stdinLines)};
+              let stdinIndex = 0;
+
+              window.console.log = function(...args) {
+                const formatted = args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' ');
+                window.parent.postMessage({ type: 'log', val: formatted }, '*');
+              };
+
+              window.prompt = function(message) {
+                if (stdinIndex < stdinLines.length) {
+                  const input = stdinLines[stdinIndex++];
+                  window.console.log("[stdin prompt]: " + (message || "") + " -> " + input);
+                  return input;
+                }
+                window.console.log("[stdin prompt]: " + (message || "") + " -> [EOF / Empty Input]");
+                return null;
+              };
+
+              window.onerror = function(message, source, lineno, colno, error) {
+                window.parent.postMessage({ type: 'error', error: message + ' (Line ' + lineno + ':' + colno + ')' }, '*');
+                return true;
+              };
+
+              window.onload = function() {
+                try {
+                  (function() { ${code} })();
+                  window.parent.postMessage({ type: 'done' }, '*');
+                } catch (err) {
+                  window.parent.postMessage({ type: 'error', error: err.message }, '*');
+                }
+              };
+            })();
           </script>
         </head>
         <body></body>
@@ -256,7 +333,7 @@ function executeJavaScriptSandboxed(code) {
 /**
  * Execute Python/C/C++/C# code via EMKC Piston Compilation API.
  */
-async function executeRemoteCompiler(code, language) {
+async function executeRemoteCompiler(code, language, stdin = '') {
   const config = LANGUAGE_CONFIGS[language];
   if (!config) return { success: false, error: `Language configuration missing for: ${language}` };
 
@@ -277,7 +354,8 @@ async function executeRemoteCompiler(code, language) {
     const payload = {
       language: config.language,
       version: config.version,
-      files: [{ name: getFileName(language), content: code }]
+      files: [{ name: getFileName(language), content: code }],
+      stdin: stdin
     };
 
     const response = await fetch('/api/compile', {

@@ -286,6 +286,33 @@ app.post('/api/rollback/:docId/:checkpointId', async (req, res) => {
 });
 
 /**
+ * POST /api/save-code/:docId — Explicitly force save the document Yjs CRDT state to disk.
+ */
+app.post('/api/save-code/:docId', async (req, res) => {
+  try {
+    const { docId } = req.params;
+    const liveDoc = docs.get(docId);
+    if (!liveDoc) {
+      return res.status(404).json({ ok: false, error: 'Active collaboration document room is empty or inactive in memory' });
+    }
+
+    const encoded = Y.encodeStateAsUpdate(liveDoc);
+    await persistence.writeDocument(docId, encoded);
+    logger.info('document_explicitly_saved_to_disk', { docId, byteSize: encoded.byteLength });
+
+    // Also trigger checkpoint creation immediately
+    await snapshots.createCheckpoint(docId, liveDoc).catch((err) => {
+      logger.error('save_code_checkpoint_creation_error', { docId, error: err.message });
+    });
+
+    res.json({ ok: true, message: 'Document persistently saved' });
+  } catch (err) {
+    logger.error('api_save_code_error', { docId: req.params.docId, error: err.message });
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/**
  * POST /api/compile — Proxy route to run code via EMKC Piston compilation engine.
  * Bypasses browser CORS policy and secures external requests.
  */

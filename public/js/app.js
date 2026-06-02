@@ -178,7 +178,7 @@ async function init() {
   initDebugPanel(provider);
 
   // Initialize Collaborative Code Compiler
-  initCompiler(provider, ydoc, quill);
+  initCompiler(provider, ydoc, quill, docId);
 
   // Initialize Workspace Tab Switcher
   initWorkspaceTabs(quill);
