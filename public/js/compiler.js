@@ -149,9 +149,11 @@ export function initCompiler(provider, ydoc, quill, docId) {
         if (pythonPrompts.length > 0) {
           inputs = await getTerminalInputs(pythonPrompts, false);
         } else {
+          const cPrompts = extractCStylePrompts(code, activeLang);
           const prompts = [];
           for (let i = 0; i < inputCount; i++) {
-            prompts.push(`[stdin required] Enter value ${i + 1} for Python program:`);
+            const customPrompt = cPrompts[i];
+            prompts.push(customPrompt || `[stdin required] Enter value ${i + 1} for Python program:`);
           }
           inputs = await getTerminalInputs(prompts, false);
         }
@@ -160,9 +162,11 @@ export function initCompiler(provider, ydoc, quill, docId) {
         if (jsPrompts.length > 0) {
           inputs = await getTerminalInputs(jsPrompts, false);
         } else {
+          const cPrompts = extractCStylePrompts(code, activeLang);
           const prompts = [];
           for (let i = 0; i < inputCount; i++) {
-            prompts.push(`[stdin required] Enter value ${i + 1} for JavaScript program:`);
+            const customPrompt = cPrompts[i];
+            prompts.push(customPrompt || `[stdin required] Enter value ${i + 1} for JavaScript program:`);
           }
           inputs = await getTerminalInputs(prompts, false);
         }
@@ -170,9 +174,11 @@ export function initCompiler(provider, ydoc, quill, docId) {
         // C, C++, C#
         const langNames = { cpp: 'C++', c: 'C', csharp: 'C#' };
         const langName = langNames[activeLang] || activeLang;
+        const cPrompts = extractCStylePrompts(code, activeLang);
         const prompts = [];
         for (let i = 0; i < inputCount; i++) {
-          prompts.push(`[stdin required] Enter value ${i + 1} for ${langName} program:`);
+          const customPrompt = cPrompts[i];
+          prompts.push(customPrompt || `[stdin required] Enter value ${i + 1} for ${langName} program:`);
         }
         inputs = await getTerminalInputs(prompts, false);
       }
@@ -646,6 +652,68 @@ function countStdinExpectations(code, language) {
   }
   
   return count;
+}
+
+/**
+ * Extracts printing prompts that statically precede input operations.
+ */
+function extractCStylePrompts(code, language) {
+  if (!code) return [];
+  const cleanCode = cleanComments(code, language);
+  
+  let printRegex;
+  let inputRegex;
+  
+  if (language === 'c' || language === 'cpp') {
+    printRegex = /(?:std::)?cout\s*<<\s*(["'])([\s\S]*?)\1|printf\s*\(\s*(["'])([\s\S]*?)\3\s*(?:,[^)]*)?\)|puts\s*\(\s*(["'])([\s\S]*?)\5\s*\)/g;
+    inputRegex = /scanf\s*\(|cin\s*>>|std::cin|gets\s*\(|fgets\s*\(\s*[a-zA-Z0-9_]+,\s*[a-zA-Z0-9_]+,\s*stdin\)/g;
+  } else if (language === 'csharp') {
+    printRegex = /Console\.(?:Write|WriteLine)\s*\(\s*(["'])([\s\S]*?)\1\s*(?:,[^)]*)?\)/g;
+    inputRegex = /Console\.ReadLine|Console\.Read/g;
+  } else if (language === 'python') {
+    printRegex = /print\s*\(\s*(["'])([\s\S]*?)\1\s*\)/g;
+    inputRegex = /input\s*\(|sys\.stdin/g;
+  } else if (language === 'javascript') {
+    printRegex = /(?:console\.log|alert)\s*\(\s*(["'])([\s\S]*?)\1\s*\)/g;
+    inputRegex = /prompt\s*\(|readline|process\.stdin/g;
+  } else {
+    return [];
+  }
+
+  const elements = [];
+  let match;
+  
+  while ((match = printRegex.exec(cleanCode)) !== null) {
+    const text = match[2] || match[4] || match[6] || match[0];
+    const cleanText = text.replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\"/g, '"').replace(/\\'/g, "'").trim();
+    if (cleanText) {
+      elements.push({ type: 'print', index: match.index, text: cleanText });
+    }
+  }
+  
+  while ((match = inputRegex.exec(cleanCode)) !== null) {
+    elements.push({ type: 'input', index: match.index });
+  }
+  
+  elements.sort((a, b) => a.index - b.index);
+  
+  const inputPrompts = [];
+  let lastPrintText = null;
+  
+  for (const el of elements) {
+    if (el.type === 'print') {
+      lastPrintText = el.text;
+    } else if (el.type === 'input') {
+      if (lastPrintText !== null) {
+        inputPrompts.push(lastPrintText);
+        lastPrintText = null;
+      } else {
+        inputPrompts.push(null);
+      }
+    }
+  }
+  
+  return inputPrompts;
 }
 
 /**
