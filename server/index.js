@@ -353,6 +353,13 @@ app.post('/api/compile', async (req, res) => {
       stdin: req.body.stdin || ''
     };
 
+    if (files.length > 1) {
+      payload.codes = files.slice(1).map(file => ({
+        file: file.name,
+        code: file.content
+      }));
+    }
+
     // Set up a fetch call with an abort timeout of 15 seconds (C# template compilation can take up to 6 seconds)
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 15000);

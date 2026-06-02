@@ -137,9 +137,24 @@
                 ⚡ Run Code
               </button>
             </div>
+          <!-- File Tabs Bar -->
+          <div class="ide-tabs-bar" id="ide-tabs-bar">
+            <!-- Dynamically populated active tabs -->
           </div>
-          <div class="code-editor-wrapper">
-            <textarea id="code-textarea"></textarea>
+          <div class="compiler-editor-body">
+            <!-- Collapsible File Explorer Sidebar -->
+            <div class="ide-file-tree" id="ide-file-tree">
+              <div class="file-tree-header">
+                <span>📁 Workspace Files</span>
+                <button class="btn-add-file" id="btn-add-file" title="Create new file">+</button>
+              </div>
+              <ul class="file-list" id="ide-file-list">
+                <!-- Dynamically populated list of files -->
+              </ul>
+            </div>
+            <div class="code-editor-wrapper">
+              <textarea id="code-textarea"></textarea>
+            </div>
           </div>
         </div>
 

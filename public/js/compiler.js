@@ -1,4 +1,5 @@
 import { showToast } from './app.js';
+import * as Y from 'yjs';
 
 const PISTON_API_URL = 'https://emkc.org/api/v2/piston/execute';
 
@@ -11,6 +12,59 @@ const LANGUAGE_CONFIGS = {
 };
 
 let editorInstance = null;
+let activeFile = null;
+let openTabs = [];
+let yfiles = null;
+let ydocRef = null;
+let currentObserveFn = null;
+let currentChangeFn = null;
+let currentTextObject = null;
+
+/**
+ * Helper to determine file icon matching extension
+ */
+function getFileIcon(filename) {
+  const ext = filename.split('.').pop().toLowerCase();
+  switch (ext) {
+    case 'py': return '🐍';
+    case 'js': return '🟨';
+    case 'c': return '🇨';
+    case 'cpp': return '➕';
+    case 'cs': return '♯';
+    default: return '📄';
+  }
+}
+
+/**
+ * Helper to determine mode from extension
+ */
+function getModeFromExtension(ext) {
+  switch (ext) {
+    case 'py': return 'python';
+    case 'js': return 'javascript';
+    case 'c': return 'text/x-csrc';
+    case 'cpp':
+    case 'h':
+    case 'hpp':
+      return 'text/x-c++src';
+    case 'cs': return 'text/x-csharp';
+    default: return 'javascript';
+  }
+}
+
+/**
+ * Gets extension for language dropdown selection
+ */
+function getLanguageExtension(lang) {
+  switch (lang) {
+    case 'python': return 'py';
+    case 'cpp': return 'cpp';
+    case 'c': return 'c';
+    case 'csharp': return 'cs';
+    case 'javascript': return 'js';
+    default: return 'txt';
+  }
+}
 
 /**
  * Initializes the collaborative Code Compiler workspace.
@@ -22,6 +76,8 @@ let editorInstance = null;
 export function initCompiler(provider, ydoc, quill, docId) {
   const codeTextarea = document.getElementById('code-textarea');
   if (!codeTextarea) return;
+
+  ydocRef = ydoc;
 
   // 1. Initialize CodeMirror 5 editor
   const editor = window.CodeMirror.fromTextArea(codeTextarea, {
@@ -35,78 +91,105 @@ export function initCompiler(provider, ydoc, quill, docId) {
   window.codeMirrorInstance = editor;
 
   // 2. Obtain Yjs Shared Types
-  const ycode = ydoc.getText('code');
+  yfiles = ydoc.getMap('workspace_files');
   const ymeta = ydoc.getMap('metadata');
+  const ycode = ydoc.getText('code'); // for backward compatibility/migration
 
-  // 3. Bind CodeMirror to Yjs for real-time collaboration
-  let isSettingValue = false;
-
-  // Update Yjs from CodeMirror inputs
-  editor.on('change', (instance, changeObj) => {
-    if (changeObj.origin === 'setValue') return;
-
-    const fromIndex = instance.indexFromPos(changeObj.from);
-    const textRemoved = changeObj.removed.join('\n');
-    const textAdded = changeObj.text.join('\n');
-
-    ydoc.transact(() => {
-      if (textRemoved.length > 0) {
-        ycode.delete(fromIndex, textRemoved.length);
-      }
-      if (textAdded.length > 0) {
-        ycode.insert(fromIndex, textAdded);
-      }
-    });
-  });
-
-  // Update CodeMirror from Yjs sync events
-  ycode.observe((event) => {
-    if (event.transaction.local) return;
-
-    isSettingValue = true;
-    let index = 0;
-    
-    event.changes.delta.forEach((op) => {
-      if (op.retain) {
-        index += op.retain;
-      } else if (op.insert) {
-        const fromPos = editor.posFromIndex(index);
-        editor.replaceRange(op.insert, fromPos, fromPos, 'setValue');
-        index += op.insert.length;
-      } else if (op.delete) {
-        const fromPos = editor.posFromIndex(index);
-        const toPos = editor.posFromIndex(index + op.delete);
-        editor.replaceRange('', fromPos, toPos, 'setValue');
-      }
-    });
-    isSettingValue = false;
-  });
-
-  // 4. Setup Language Selector Synchronization via Y.Map
+  // 3. Migrate single-file code if yfiles is empty
   const languageDropdown = document.getElementById('compiler-language');
+  const initialLang = languageDropdown?.value || 'javascript';
   
+  if (yfiles.size === 0) {
+    ydoc.transact(() => {
+      const ext = getLanguageExtension(initialLang);
+      const defaultName = `main.${ext}`;
+      const defaultText = ycode.toString().trim() || `// Write your ${initialLang} code here...\n`;
+      const fileText = new Y.Text();
+      fileText.insert(0, defaultText);
+      yfiles.set(defaultName, fileText);
+    });
+  }
+
+  // Set default active file
+  const filenames = Array.from(yfiles.keys());
+  activeFile = filenames.includes(`main.${getLanguageExtension(initialLang)}`) 
+    ? `main.${getLanguageExtension(initialLang)}` 
+    : filenames[0];
+
+  if (!openTabs.includes(activeFile)) {
+    openTabs.push(activeFile);
+  }
+
+  // 4. Bind initial file
+  bindFileToEditor(activeFile);
+
+  // 5. Watch for dynamic remote file list modifications
+  yfiles.observe((event) => {
+    renderFileTree();
+    renderTabs();
+
+    // If active file was deleted, switch to another
+    if (activeFile && !yfiles.has(activeFile)) {
+      const remaining = Array.from(yfiles.keys());
+      if (remaining.length > 0) {
+        selectFile(remaining[0]);
+      }
+    }
+  });
+
+  // Render initial panels
+  renderFileTree();
+  renderTabs();
+
+  // 6. Setup Language Selector Synchronization via Y.Map
   languageDropdown.addEventListener('change', () => {
     const selectedLang = languageDropdown.value;
     ymeta.set('language', selectedLang);
+
+    // If active file is main.[old_ext], rename it to main.[new_ext]
+    const currentExt = activeFile.split('.').pop();
+    const newExt = getLanguageExtension(selectedLang);
+    if (activeFile.startsWith('main.') && currentExt !== newExt) {
+      const newName = `main.${newExt}`;
+      renameFile(activeFile, newName);
+    }
   });
 
-  // Listen to remote changes of editor language syntax
+  // Listen to remote changes of workspace compiler language
   ymeta.observe(() => {
     const remoteLanguage = ymeta.get('language') || 'javascript';
     if (languageDropdown.value !== remoteLanguage) {
       languageDropdown.value = remoteLanguage;
     }
-    updateEditorMode(remoteLanguage);
   });
 
-  function updateEditorMode(lang) {
-    const config = LANGUAGE_CONFIGS[lang];
-    if (config) {
-      editor.setOption('mode', config.mode);
-    }
-  }
+  // 7. Setup file creation listener
+  const addFileBtn = document.getElementById('btn-add-file');
+  addFileBtn.addEventListener('click', () => {
+    const filename = prompt('Enter new file name (e.g. utils.py, data.js):');
+    if (!filename) return;
 
-  // 5. Code Execution Controls
+    const cleanName = filename.trim().replace(/\s+/g, '-').replace(/[^a-zA-Z0-9_\-\.]/g, '');
+    if (!cleanName) {
+      showToast('Invalid file name characters.', 'error');
+      return;
+    }
+
+    if (yfiles.has(cleanName)) {
+      showToast('File name already exists.', 'error');
+      return;
+    }
+
+    ydoc.transact(() => {
+      const fileText = new Y.Text();
+      fileText.insert(0, '');
+      yfiles.set(cleanName, fileText);
+    });
+
+    selectFile(cleanName);
+  });
+
+  // 8. Code Execution Controls
   const runBtn = document.getElementById('compiler-run-btn');
   const terminalConsole = document.getElementById('terminal-console');
   const stdinContainer = document.getElementById('stdin-container');
@@ -133,7 +216,7 @@ export function initCompiler(provider, ydoc, quill, docId) {
 
     let stdinValue = '';
 
-    // Interactive Inline Terminal Prompt if code expects input
+    // Interactive Inline Terminal Prompt if active file expects input
     if (detectStdinExpectation(code, activeLang)) {
       runBtn.disabled = true;
       runBtn.innerHTML = `
@@ -206,7 +289,23 @@ export function initCompiler(provider, ydoc, quill, docId) {
       if (activeLang === 'javascript') {
         result = await executeJavaScriptSandboxed(code, stdinValue);
       } else {
-        result = await executeRemoteCompiler(code, activeLang, stdinValue);
+        // Compile all workspace files, passing active file first (entry point)
+        const filesPayload = [];
+        yfiles.forEach((ytext, filename) => {
+          filesPayload.push({
+            name: filename,
+            content: filename === activeFile ? code : ytext.toString()
+          });
+        });
+
+        // Sort activeFile to the front
+        const activeIdx = filesPayload.findIndex(f => f.name === activeFile);
+        if (activeIdx !== -1) {
+          const [activeFileObj] = filesPayload.splice(activeIdx, 1);
+          filesPayload.unshift(activeFileObj);
+        }
+
+        result = await executeRemoteCompilerMultiFile(filesPayload, activeLang, stdinValue);
       }
 
       if (result.success) {
@@ -303,7 +402,7 @@ export function initCompiler(provider, ydoc, quill, docId) {
     }
   }
 
-  // 6. Save Code Control
+  // 9. Save Code Control
   const saveBtn = document.getElementById('compiler-save-btn');
   if (saveBtn) {
     saveBtn.addEventListener('click', async () => {
@@ -317,7 +416,7 @@ export function initCompiler(provider, ydoc, quill, docId) {
         });
         const data = await response.json();
         if (data.ok) {
-          showToast('Code saved successfully to database!', 'success', 3000);
+          showToast('All workspace files saved to server!', 'success', 3000);
         } else {
           showToast(`Save failed: ${data.error}`, 'error', 4000);
         }
@@ -330,34 +429,27 @@ export function initCompiler(provider, ydoc, quill, docId) {
     });
   }
 
-  // 6.5 Download Code Control
+  // 10. Download Code Control
   const downloadBtn = document.getElementById('compiler-download-btn');
   if (downloadBtn) {
     downloadBtn.addEventListener('click', () => {
       const codeText = window.codeMirrorInstance ? window.codeMirrorInstance.getValue() : '';
-      const activeLang = document.getElementById('compiler-language')?.value || 'javascript';
       
-      let fileExt = 'js';
-      if (activeLang === 'python') fileExt = 'py';
-      else if (activeLang === 'cpp') fileExt = 'cpp';
-      else if (activeLang === 'c') fileExt = 'c';
-      else if (activeLang === 'csharp') fileExt = 'cs';
-
       const blob = new Blob([codeText], { type: 'text/plain;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `code_${docId}.${fileExt}`;
+      a.download = activeFile;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       
-      showToast(`Code downloaded successfully as code_${docId}.${fileExt}!`, 'success', 3000);
+      showToast(`Downloaded active file ${activeFile}!`, 'success', 3000);
     });
   }
 
-  // 7. Stdin Synchronization via Yjs
+  // 11. Stdin Synchronization via Yjs
   const ystdin = ydoc.getText('stdin');
   if (stdinTextarea) {
     let isSettingStdin = false;
@@ -386,7 +478,267 @@ export function initCompiler(provider, ydoc, quill, docId) {
 }
 
 /**
- * Execute JS inside a secure client iframe sandbox.
+ * Bind CodeMirror to a specific file's Y.Text representation
+ */
+function bindFileToEditor(filename) {
+  if (!yfiles || !yfiles.has(filename)) return;
+
+  const ytext = yfiles.get(filename);
+
+  // Unsubscribe old listeners
+  if (currentChangeFn) {
+    editorInstance.off('change', currentChangeFn);
+  }
+  if (currentObserveFn && currentTextObject) {
+    currentTextObject.unobserve(currentObserveFn);
+  }
+
+  currentTextObject = ytext;
+
+  // Swap content
+  editorInstance.setValue(ytext.toString());
+
+  // Set proper syntax mode highlight
+  const ext = filename.split('.').pop().toLowerCase();
+  editorInstance.setOption('mode', getModeFromExtension(ext));
+
+  // local changes -> Yjs
+  currentChangeFn = (instance, changeObj) => {
+    if (changeObj.origin === 'setValue') return;
+
+    const fromIndex = instance.indexFromPos(changeObj.from);
+    const textRemoved = changeObj.removed.join('\n');
+    const textAdded = changeObj.text.join('\n');
+
+    ydocRef.transact(() => {
+      if (textRemoved.length > 0) {
+        ytext.delete(fromIndex, textRemoved.length);
+      }
+      if (textAdded.length > 0) {
+        ytext.insert(fromIndex, textAdded);
+      }
+    });
+  };
+  editorInstance.on('change', currentChangeFn);
+
+  // Yjs sync -> editor
+  currentObserveFn = (event) => {
+    if (event.transaction.local) return;
+
+    // Apply granular deltas to preserve cursor position
+    let index = 0;
+    event.changes.delta.forEach((op) => {
+      if (op.retain) {
+        index += op.retain;
+      } else if (op.insert) {
+        const fromPos = editorInstance.posFromIndex(index);
+        editorInstance.replaceRange(op.insert, fromPos, fromPos, 'setValue');
+        index += op.insert.length;
+      } else if (op.delete) {
+        const fromPos = editorInstance.posFromIndex(index);
+        const toPos = editorInstance.posFromIndex(index + op.delete);
+        editorInstance.replaceRange('', fromPos, toPos, 'setValue');
+      }
+    });
+  };
+  ytext.observe(currentObserveFn);
+}
+
+/**
+ * Selection helper
+ */
+function selectFile(filename) {
+  if (activeFile === filename) return;
+  activeFile = filename;
+  if (!openTabs.includes(filename)) {
+    openTabs.push(filename);
+  }
+  bindFileToEditor(filename);
+  renderFileTree();
+  renderTabs();
+}
+
+/**
+ * Rename workspace file
+ */
+function renameFile(oldName, newName) {
+  if (!newName || oldName === newName) return;
+  const cleanName = newName.trim().replace(/\s+/g, '-').replace(/[^a-zA-Z0-9_\-\.]/g, '');
+  if (!cleanName) {
+    showToast('Invalid file name.', 'error');
+    return;
+  }
+
+  if (yfiles.has(cleanName)) {
+    showToast('File already exists.', 'error');
+    return;
+  }
+
+  ydocRef.transact(() => {
+    const oldText = yfiles.get(oldName);
+    const newText = new Y.Text();
+    newText.insert(0, oldText.toString());
+    yfiles.set(cleanName, newText);
+    yfiles.delete(oldName);
+  });
+
+  // Switch tab target
+  openTabs = openTabs.map(t => t === oldName ? cleanName : t);
+  if (activeFile === oldName) {
+    activeFile = cleanName;
+    bindFileToEditor(cleanName);
+  }
+
+  renderFileTree();
+  renderTabs();
+  showToast(`Renamed ${oldName} to ${cleanName}`, 'success');
+}
+
+/**
+ * Delete workspace file
+ */
+function deleteFile(filename) {
+  if (yfiles.size <= 1) {
+    showToast('Cannot delete the last remaining file.', 'warning');
+    return;
+  }
+
+  if (!confirm(`Are you sure you want to delete "${filename}"?`)) return;
+
+  ydocRef.transact(() => {
+    yfiles.delete(filename);
+  });
+
+  openTabs = openTabs.filter(t => t !== filename);
+  if (activeFile === filename) {
+    const remaining = Array.from(yfiles.keys());
+    selectFile(remaining[0]);
+  } else {
+    renderFileTree();
+    renderTabs();
+  }
+  showToast(`Deleted ${filename}`, 'info');
+}
+
+/**
+ * Close tab helper
+ */
+function closeTab(filename) {
+  openTabs = openTabs.filter(t => t !== filename);
+  if (activeFile === filename) {
+    if (openTabs.length > 0) {
+      selectFile(openTabs[0]);
+    } else {
+      const remaining = Array.from(yfiles.keys());
+      selectFile(remaining[0]);
+    }
+  } else {
+    renderTabs();
+  }
+}
+
+/**
+ * Redraw file tree DOM elements
+ */
+function renderFileTree() {
+  const fileList = document.getElementById('ide-file-list');
+  if (!fileList) return;
+  fileList.innerHTML = '';
+
+  const filenames = Array.from(yfiles.keys()).sort();
+  filenames.forEach(filename => {
+    const li = document.createElement('li');
+    li.className = `file-item ${filename === activeFile ? 'active' : ''}`;
+
+    const left = document.createElement('div');
+    left.className = 'file-item-left';
+
+    const icon = document.createElement('span');
+    icon.className = 'file-icon';
+    icon.textContent = getFileIcon(filename);
+    left.appendChild(icon);
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'file-name';
+    nameSpan.textContent = filename;
+    left.appendChild(nameSpan);
+
+    li.appendChild(left);
+
+    // Actions block
+    const actions = document.createElement('div');
+    actions.className = 'file-item-actions';
+
+    const editBtn = document.createElement('button');
+    editBtn.className = 'file-action-btn';
+    editBtn.innerHTML = '✏️';
+    editBtn.title = 'Rename File';
+    editBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const newName = prompt(`Rename "${filename}" to:`, filename);
+      if (newName) renameFile(filename, newName);
+    });
+    actions.appendChild(editBtn);
+
+    if (filenames.length > 1) {
+      const delBtn = document.createElement('button');
+      delBtn.className = 'file-action-btn';
+      delBtn.innerHTML = '🗑️';
+      delBtn.title = 'Delete File';
+      delBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteFile(filename);
+      });
+      actions.appendChild(delBtn);
+    }
+
+    li.appendChild(actions);
+
+    li.addEventListener('click', () => {
+      selectFile(filename);
+    });
+
+    fileList.appendChild(li);
+  });
+}
+
+/**
+ * Redraw open file tabs
+ */
+function renderTabs() {
+  const tabsBar = document.getElementById('ide-tabs-bar');
+  if (!tabsBar) return;
+  tabsBar.innerHTML = '';
+
+  openTabs.forEach(filename => {
+    if (!yfiles.has(filename)) return; // safety check
+
+    const tab = document.createElement('div');
+    tab.className = `ide-tab ${filename === activeFile ? 'active' : ''}`;
+
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = filename;
+    tab.appendChild(nameSpan);
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'ide-tab-close';
+    closeBtn.textContent = '✕';
+    closeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeTab(filename);
+    });
+    tab.appendChild(closeBtn);
+
+    tab.addEventListener('click', () => {
+      selectFile(filename);
+    });
+
+    tabsBar.appendChild(tab);
+  });
+}
+
+/**
+ * Execute JS inside client-side sandboxed iframe
  */
 function executeJavaScriptSandboxed(code, stdin = '') {
   return new Promise((resolve) => {
@@ -477,9 +829,9 @@ function executeJavaScriptSandboxed(code, stdin = '') {
 }
 
 /**
- * Execute Python/C/C++/C# code via EMKC Piston Compilation API.
+ * Execute Python/C/C++/C# code via backend Wandbox proxy with multi-file support
  */
-async function executeRemoteCompiler(code, language, stdin = '') {
+async function executeRemoteCompilerMultiFile(files, language, stdin = '') {
   const config = LANGUAGE_CONFIGS[language];
   if (!config) return { success: false, error: `Language configuration missing for: ${language}` };
 
@@ -487,20 +839,10 @@ async function executeRemoteCompiler(code, language, stdin = '') {
   const timeoutId = setTimeout(() => controller.abort(), 16000);
 
   try {
-    const getFileName = (lang) => {
-      switch (lang) {
-        case 'cpp': return 'main.cpp';
-        case 'c': return 'main.c';
-        case 'csharp': return 'main.cs';
-        case 'python': return 'main.py';
-        default: return 'main.txt';
-      }
-    };
-
     const payload = {
       language: config.language,
       version: config.version,
-      files: [{ name: getFileName(language), content: code }],
+      files: files,
       stdin: stdin
     };
 

@@ -1378,6 +1378,209 @@ body {
   caret-color: #3b82f6; /* Blue cursor */
 }
 
+/* ==========================================================================
+   IDE Multi-file UI layout rules
+   ========================================================================== */
+.compiler-editor-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: row;
+}
+
+.ide-file-tree {
+  width: 220px;
+  background: rgba(10, 14, 23, 0.4);
+  border-right: var(--border-glass);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  min-height: 0;
+}
+
+.file-tree-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: rgba(17, 24, 39, 0.3);
+  border-bottom: var(--border-glass);
+  font-family: var(--font-sans);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.btn-add-file {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+  border-radius: 4px;
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+
+.btn-add-file:hover {
+  color: var(--color-accent);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.file-list {
+  list-style: none;
+  padding: 8px 4px;
+  margin: 0;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.file-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-bottom: 2px;
+  transition: all var(--transition-fast);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  user-select: none;
+}
+
+.file-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
+}
+
+.file-item.active {
+  background: rgba(59, 130, 246, 0.15);
+  border-left: 3px solid var(--color-accent);
+  color: #fff;
+  font-weight: 500;
+}
+
+.file-item-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.file-icon {
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+
+.file-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-name-input {
+  background: var(--bg-app) !important;
+  border: 1px solid var(--color-accent) !important;
+  color: var(--text-primary) !important;
+  font-family: var(--font-mono) !important;
+  font-size: 0.8rem !important;
+  padding: 2px 4px !important;
+  border-radius: 4px !important;
+  outline: none !important;
+  width: 90% !important;
+}
+
+.file-item-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.file-item:hover .file-item-actions {
+  opacity: 1;
+}
+
+.file-action-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 2px;
+  border-radius: 4px;
+  transition: all var(--transition-fast);
+}
+
+.file-action-btn:hover {
+  color: var(--color-danger);
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* IDE File Tabs Bar Styles */
+.ide-tabs-bar {
+  display: flex;
+  background: rgba(10, 14, 23, 0.2);
+  border-bottom: var(--border-glass);
+  overflow-x: auto;
+  scrollbar-width: none; /* Firefox */
+}
+
+.ide-tabs-bar::-webkit-scrollbar {
+  display: none; /* Safari / Chrome */
+}
+
+.ide-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-right: var(--border-glass);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+  background: rgba(17, 24, 39, 0.2);
+  transition: all var(--transition-fast);
+  border-bottom: 2px solid transparent;
+}
+
+.ide-tab:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.ide-tab.active {
+  background: rgba(13, 17, 23, 0.9);
+  color: #fff;
+  border-bottom: 2px solid var(--color-accent);
+}
+
+.ide-tab-close {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  cursor: pointer;
+  border-radius: 50%;
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.ide-tab-close:hover {
+  color: #fff;
+  background: rgba(239, 68, 68, 0.6);
+}
+
 
 
 
