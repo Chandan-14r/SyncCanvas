@@ -142,34 +142,39 @@ export function initCompiler(provider, ydoc, quill, docId) {
       `;
 
       let inputs = null;
+      const inputCount = Math.max(1, countStdinExpectations(code, activeLang));
+
       if (activeLang === 'python') {
         const pythonPrompts = extractPythonPrompts(code);
         if (pythonPrompts.length > 0) {
           inputs = await getTerminalInputs(pythonPrompts, false);
         } else {
-          inputs = await getTerminalInputs(
-            ["This Python code expects standard input. Please enter your values:"], 
-            true
-          );
+          const prompts = [];
+          for (let i = 0; i < inputCount; i++) {
+            prompts.push(`[stdin required] Enter value ${i + 1} for Python program:`);
+          }
+          inputs = await getTerminalInputs(prompts, false);
         }
       } else if (activeLang === 'javascript') {
         const jsPrompts = extractJsPrompts(code);
         if (jsPrompts.length > 0) {
           inputs = await getTerminalInputs(jsPrompts, false);
         } else {
-          inputs = await getTerminalInputs(
-            ["This JavaScript code expects standard input. Please enter your values:"], 
-            true
-          );
+          const prompts = [];
+          for (let i = 0; i < inputCount; i++) {
+            prompts.push(`[stdin required] Enter value ${i + 1} for JavaScript program:`);
+          }
+          inputs = await getTerminalInputs(prompts, false);
         }
       } else {
         // C, C++, C#
         const langNames = { cpp: 'C++', c: 'C', csharp: 'C#' };
         const langName = langNames[activeLang] || activeLang;
-        inputs = await getTerminalInputs(
-          [`This ${langName} program expects standard input (stdin).`], 
-          true
-        );
+        const prompts = [];
+        for (let i = 0; i < inputCount; i++) {
+          prompts.push(`[stdin required] Enter value ${i + 1} for ${langName} program:`);
+        }
+        inputs = await getTerminalInputs(prompts, false);
       }
 
       runBtn.disabled = false;
@@ -596,6 +601,51 @@ function detectStdinExpectation(code, language) {
     default:
       return false;
   }
+}
+
+/**
+ * Counts how many standard input operations are statically expected in the code.
+ */
+function countStdinExpectations(code, language) {
+  if (!code) return 0;
+  const cleanCode = cleanComments(code, language);
+  let count = 0;
+  
+  if (language === 'c' || language === 'cpp') {
+    const scanfRegex = /scanf\s*\(/g;
+    const cinRegex = /cin\s*>>/g;
+    const stdCinRegex = /std::cin/g;
+    const getsRegex = /gets\s*\(/g;
+    const fgetsRegex = /fgets\s*\(\s*[a-zA-Z0-9_]+,\s*[a-zA-Z0-9_]+,\s*stdin\)/g;
+    
+    count += (cleanCode.match(scanfRegex) || []).length;
+    count += (cleanCode.match(cinRegex) || []).length;
+    count += (cleanCode.match(stdCinRegex) || []).length;
+    count += (cleanCode.match(getsRegex) || []).length;
+    count += (cleanCode.match(fgetsRegex) || []).length;
+  } else if (language === 'csharp') {
+    const readLineRegex = /Console\.ReadLine\s*\(/g;
+    const readRegex = /Console\.Read\s*\(/g;
+    
+    count += (cleanCode.match(readLineRegex) || []).length;
+    count += (cleanCode.match(readRegex) || []).length;
+  } else if (language === 'python') {
+    const inputRegex = /input\s*\(/g;
+    const stdinRegex = /sys\.stdin/g;
+    
+    count += (cleanCode.match(inputRegex) || []).length;
+    count += (cleanCode.match(stdinRegex) || []).length;
+  } else if (language === 'javascript') {
+    const promptRegex = /prompt\s*\(/g;
+    const readlineRegex = /readline/g;
+    const stdinRegex = /process\.stdin/g;
+    
+    count += (cleanCode.match(promptRegex) || []).length;
+    count += (cleanCode.match(readlineRegex) || []).length;
+    count += (cleanCode.match(stdinRegex) || []).length;
+  }
+  
+  return count;
 }
 
 /**
