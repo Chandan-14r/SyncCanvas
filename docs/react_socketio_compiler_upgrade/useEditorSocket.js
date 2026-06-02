@@ -8,17 +8,20 @@ const SOCKET_SERVER = process.env.REACT_APP_SOCKET_URL || 'http://localhost:3000
  * Manages separate real-time sync states for the collaborative notepad
  * and the code compiler workspace via Socket.io.
  */
-export default function useEditorSocket(roomId, username) {
+export default function useEditorSocket(roomId, username, onCodeSavedCallback) {
   const [plainText, setPlainText] = useState('');
   const [codeText, setCodeText] = useState('');
   const [language, setLanguage] = useState('javascript');
+  const [stdin, setStdin] = useState('');
   const [syncStatus, setSyncStatus] = useState('disconnected');
+  const [lastSaved, setLastSaved] = useState(null);
   
   const socketRef = useRef(null);
   
   // Track last committed values from sockets to prevent infinite echo loops
   const lastPlainTextRef = useRef('');
   const lastCodeTextRef = useRef('');
+  const lastStdinRef = useRef('');
 
   useEffect(() => {
     if (!roomId) return;
@@ -44,13 +47,15 @@ export default function useEditorSocket(roomId, username) {
     });
 
     // 3. Event Listeners: Workspace States Initialization
-    socket.on('init-state', ({ plainText: initPlainText, codeContent: initCodeText, codeLanguage: initLang }) => {
+    socket.on('init-state', ({ plainText: initPlainText, codeContent: initCodeText, codeLanguage: initLang, codeStdin: initStdin }) => {
       lastPlainTextRef.current = initPlainText || '';
       lastCodeTextRef.current = initCodeText || '';
+      lastStdinRef.current = initStdin || '';
       
       setPlainText(initPlainText || '');
       setCodeText(initCodeText || '');
       setLanguage(initLang || 'javascript');
+      setStdin(initStdin || '');
       setSyncStatus('synced');
     });
 
@@ -71,6 +76,20 @@ export default function useEditorSocket(roomId, username) {
       setLanguage(updatedLang);
     });
 
+    // 7. Event Listeners: Program Input (stdin) Sync
+    socket.on('receive-stdin-change', (updatedStdin) => {
+      lastStdinRef.current = updatedStdin;
+      setStdin(updatedStdin);
+    });
+
+    // 8. Event Listeners: Code Saved Notification
+    socket.on('code-saved', ({ updatedAt, code, language: savedLang, stdin: savedStdin }) => {
+      setLastSaved(new Date(updatedAt));
+      if (onCodeSavedCallback) {
+        onCodeSavedCallback({ code, language: savedLang, stdin: savedStdin, updatedAt });
+      }
+    });
+
     return () => {
       socket.off('connect');
       socket.off('disconnect');
@@ -78,16 +97,17 @@ export default function useEditorSocket(roomId, username) {
       socket.off('receive-plain-text');
       socket.off('receive-code-change');
       socket.off('receive-language-change');
+      socket.off('receive-stdin-change');
+      socket.off('code-saved');
       socket.disconnect();
     };
-  }, [roomId, username]);
+  }, [roomId, username, onCodeSavedCallback]);
 
   // --- State Broadcasters (Invoked by UI Inputs) ---
 
   /** Emits edits made in the plain text notepad */
   const broadcastPlainText = (newText) => {
     setPlainText(newText);
-    // Bypasses socket emit if the text is identical to what was just received
     if (newText === lastPlainTextRef.current) return;
     
     lastPlainTextRef.current = newText;
@@ -97,7 +117,6 @@ export default function useEditorSocket(roomId, username) {
   /** Emits edits made in the CodeMirror editor */
   const broadcastCodeChange = (newCode) => {
     setCodeText(newCode);
-    // Bypasses socket emit if the code is identical to what was just received
     if (newCode === lastCodeTextRef.current) return;
 
     lastCodeTextRef.current = newCode;
@@ -110,13 +129,36 @@ export default function useEditorSocket(roomId, username) {
     socketRef.current?.emit('language-change', { roomId, language: newLang });
   };
 
+  /** Emits program input (stdin) changes */
+  const broadcastStdinChange = (newStdin) => {
+    setStdin(newStdin);
+    if (newStdin === lastStdinRef.current) return;
+
+    lastStdinRef.current = newStdin;
+    socketRef.current?.emit('stdin-change', { roomId, stdin: newStdin });
+  };
+
+  /** Explicitly triggers saving code, language, and stdin to the server */
+  const saveCodeState = () => {
+    socketRef.current?.emit('save-code', {
+      roomId,
+      code: codeText,
+      language,
+      stdin
+    });
+  };
+
   return {
     plainText,
     codeText,
     language,
+    stdin,
     syncStatus,
+    lastSaved,
     broadcastPlainText,
     broadcastCodeChange,
-    broadcastLanguageChange
+    broadcastLanguageChange,
+    broadcastStdinChange,
+    saveCodeState
   };
 }

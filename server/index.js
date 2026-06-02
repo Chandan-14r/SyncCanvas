@@ -320,7 +320,8 @@ app.post('/api/compile', async (req, res) => {
 
     const payload = {
       compiler: compilerId,
-      code: code
+      code: code,
+      stdin: req.body.stdin || ''
     };
 
     // Set up a fetch call with an abort timeout of 15 seconds (C# template compilation can take up to 6 seconds)

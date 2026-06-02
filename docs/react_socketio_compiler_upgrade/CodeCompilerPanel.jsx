@@ -7,7 +7,7 @@ import { vscodeDark } from '@uiw/codemirror-theme-vscode';
 
 /**
  * CodeCompilerPanel Component
- * Houses the collaborative CodeMirror editor, language selector, and controls.
+ * Houses the collaborative CodeMirror editor, language selector, save features, and indicators.
  */
 export default function CodeCompilerPanel({
   code,
@@ -15,6 +15,8 @@ export default function CodeCompilerPanel({
   onChangeCode,
   onChangeLanguage,
   onRunCode,
+  onSaveCode,
+  lastSaved,
   isRunning,
   syncStatus
 }) {
@@ -35,9 +37,9 @@ export default function CodeCompilerPanel({
   };
 
   return (
-    <div className="flex flex-col flex-1 bg-slate-950/80 border border-white/5 rounded-xl overflow-hidden shadow-2xl">
+    <div className="flex flex-col flex-1 bg-slate-950/80 border border-white/5 rounded-xl overflow-hidden shadow-2xl h-full">
       {/* Editor Control Toolbar */}
-      <div className="flex flex-wrap items-center justify-between px-4 py-3 bg-slate-900/90 border-b border-white/5 gap-2">
+      <div className="flex flex-wrap items-center justify-between px-4 py-3 bg-slate-900/90 border-b border-white/5 gap-3">
         <div className="flex items-center space-x-3">
           <span className="font-semibold text-white tracking-wide">💻 Coding Workspace</span>
           <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
@@ -47,17 +49,22 @@ export default function CodeCompilerPanel({
           }`}>
             {syncStatus === 'synced' ? '● Synced' : syncStatus === 'syncing' ? '● Syncing...' : 'Disconnected'}
           </span>
+          {lastSaved && (
+            <span className="text-xs text-slate-500 font-mono hidden md:inline">
+              Saved at {new Date(lastSaved).toLocaleTimeString()}
+            </span>
+          )}
         </div>
         
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-2">
           {/* Language Selector Dropdown */}
           <div className="relative">
             <select
               value={language}
               onChange={(e) => onChangeLanguage(e.target.value)}
-              className="appearance-none bg-slate-800 border border-white/10 text-slate-200 text-sm rounded-lg px-4 py-1.5 pr-8 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer"
+              className="appearance-none bg-slate-800 border border-white/10 text-slate-200 text-sm rounded-lg px-3 py-1.5 pr-8 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 cursor-pointer"
             >
-              <option value="javascript">JavaScript (Node.js)</option>
+              <option value="javascript">JavaScript (Local Sandbox)</option>
               <option value="python">Python 3</option>
               <option value="c">C (GCC 10)</option>
               <option value="cpp">C++ (GCC 10)</option>
@@ -70,11 +77,23 @@ export default function CodeCompilerPanel({
             </div>
           </div>
 
+          {/* Save Code Button */}
+          <button
+            onClick={onSaveCode}
+            className="flex items-center space-x-1.5 px-3 py-1.5 text-sm font-semibold rounded-lg bg-blue-600 hover:bg-blue-500 hover:shadow-blue-600/15 text-white shadow-lg transition-all duration-150 active:scale-[0.98]"
+            title="Save code persistently to DB for access across devices"
+          >
+            <svg className="w-4 h-4 stroke-current" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+            </svg>
+            <span className="hidden sm:inline">Save Code</span>
+          </button>
+
           {/* Run Code Button */}
           <button
             onClick={onRunCode}
             disabled={isRunning}
-            className={`flex items-center space-x-1.5 px-4 py-1.5 text-sm font-semibold rounded-lg text-white shadow-lg transition-all duration-150 ${
+            className={`flex items-center space-x-1.5 px-3 py-1.5 text-sm font-semibold rounded-lg text-white shadow-lg transition-all duration-150 ${
               isRunning
                 ? 'bg-slate-700/50 cursor-not-allowed text-slate-400'
                 : 'bg-emerald-600 hover:bg-emerald-500 hover:shadow-emerald-600/15 active:scale-[0.98]'

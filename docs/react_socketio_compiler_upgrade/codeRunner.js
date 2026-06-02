@@ -1,13 +1,13 @@
 /**
  * Code Execution Utility for SyncCanvas Code Compiler.
  * Supports:
- * - JavaScript: Local sandboxed iframe execution
- * - Python / C++: Public Piston API coordination via proxy
+ * - JavaScript: Local sandboxed iframe execution with stdin prompt shim
+ * - Python / C++ / C / C#: Remote execution via backend proxy `/api/compile` to Wandbox/Piston
  */
 
-const PISTON_API_URL = 'https://emkc.org/api/v2/piston/execute';
+const COMPILE_API_URL = '/api/compile';
 
-// Mapping local language names to Piston API version specifications
+// Mapping local language names to backend/compiler payload specifications
 const LANGUAGE_CONFIGS = {
   python: { language: 'python', version: '3.10.0' },
   cpp: { language: 'c++', version: '10.2.0' },
@@ -21,9 +21,10 @@ const LANGUAGE_CONFIGS = {
  * 
  * @param {string} code - The source code to run
  * @param {string} language - Target language ('javascript', 'python', 'cpp', 'c', 'csharp')
+ * @param {string} stdin - Standard input string for program
  * @returns {Promise<{ success: boolean, output: string, error: string }>}
  */
-export async function executeCode(code, language) {
+export async function executeCode(code, language, stdin = '') {
   if (!code || !code.trim()) {
     return {
       success: false,
@@ -33,16 +34,17 @@ export async function executeCode(code, language) {
   }
 
   if (language === 'javascript') {
-    return runJavaScriptSandboxed(code);
+    return runJavaScriptSandboxed(code, stdin);
   } else {
-    return runRemoteCompiler(code, language);
+    return runRemoteCompiler(code, language, stdin);
   }
 }
 
 /**
  * Run JavaScript inside a secure sandboxed iframe to capture logs.
+ * Includes a synchronous mock implementation of window.prompt to read lines of stdin.
  */
-function runJavaScriptSandboxed(code) {
+function runJavaScriptSandboxed(code, stdin) {
   return new Promise((resolve) => {
     // 1. Create a hidden, sandboxed iframe
     const iframe = document.createElement('iframe');
@@ -67,7 +69,6 @@ function runJavaScriptSandboxed(code) {
 
     // Message listener to receive outputs from inside the sandbox
     const messageListener = (event) => {
-      // Validate structure
       if (!event.data || typeof event.data !== 'object') return;
       
       const { type, val, error } = event.data;
@@ -96,8 +97,13 @@ function runJavaScriptSandboxed(code) {
     function cleanup() {
       clearTimeout(executionTimeout);
       window.removeEventListener('message', messageListener);
-      document.body.removeChild(iframe);
+      if (document.body.contains(iframe)) {
+        document.body.removeChild(iframe);
+      }
     }
+
+    // Split stdin by lines for consumption by the prompt mock
+    const stdinLines = stdin ? stdin.split('\n') : [];
 
     // 3. Inject script code wrapping console and executing inside sandboxed container
     const sandboxHtml = `
@@ -105,34 +111,51 @@ function runJavaScriptSandboxed(code) {
       <html>
         <head>
           <script>
-            // Override console.log
-            window.console.log = function(...args) {
-              const formatted = args.map(arg => 
-                typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
-              ).join(' ');
-              window.parent.postMessage({ type: 'log', val: formatted }, '*');
-            };
+            (function() {
+              const stdinLines = ${JSON.stringify(stdinLines)};
+              let stdinIndex = 0;
 
-            // Catch unhandled runtime errors
-            window.onerror = function(message, source, lineno, colno, error) {
-              window.parent.postMessage({ 
-                type: 'error', 
-                error: message + ' (Line ' + lineno + ':' + colno + ')' 
-              }, '*');
-              return true;
-            };
+              // Override console.log
+              window.console.log = function(...args) {
+                const formatted = args.map(arg => 
+                  typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+                ).join(' ');
+                window.parent.postMessage({ type: 'log', val: formatted }, '*');
+              };
 
-            window.onload = function() {
-              try {
-                // Execute code in scoped container
-                (function() {
-                  ${code}
-                })();
-                window.parent.postMessage({ type: 'done' }, '*');
-              } catch (err) {
-                window.parent.postMessage({ type: 'error', error: err.message }, '*');
-              }
-            };
+              // Mock window.prompt to read stdin lines sequentially
+              window.prompt = function(message) {
+                if (stdinIndex < stdinLines.length) {
+                  const input = stdinLines[stdinIndex++];
+                  // Log prompt call visually in console
+                  window.console.log("[stdin prompt]: " + (message || "") + " -> " + input);
+                  return input;
+                }
+                window.console.log("[stdin prompt]: " + (message || "") + " -> [EOF / Empty Input]");
+                return null; // EOF
+              };
+
+              // Catch unhandled runtime errors
+              window.onerror = function(message, source, lineno, colno, error) {
+                window.parent.postMessage({ 
+                  type: 'error', 
+                  error: message + ' (Line ' + lineno + ':' + colno + ')' 
+                }, '*');
+                return true;
+              };
+
+              window.onload = function() {
+                try {
+                  // Execute code in scoped container
+                  (function() {
+                    ${code}
+                  })();
+                  window.parent.postMessage({ type: 'done' }, '*');
+                } catch (err) {
+                  window.parent.postMessage({ type: 'error', error: err.message }, '*');
+                }
+              };
+            })();
           </script>
         </head>
         <body></body>
@@ -150,13 +173,9 @@ function runJavaScriptSandboxed(code) {
 }
 
 /**
- * Execute Python or C++ code using the EMKC Piston Compilation engine.
- * Best practice recommendation: Send request through your own server proxy
- * to prevent client-side CORS policies and keep external URLs private.
- * 
- * If running directly from frontend, use this implementation:
+ * Execute Python, C++, C, or C# code using the backend compile proxy.
  */
-async function runRemoteCompiler(code, language) {
+async function runRemoteCompiler(code, language, stdin) {
   const config = LANGUAGE_CONFIGS[language];
   if (!config) {
     return {
@@ -166,9 +185,9 @@ async function runRemoteCompiler(code, language) {
     };
   }
 
-  // Set up 8s connection timeout wrapper
+  // Set up 16s connection timeout wrapper (provides enough time for MSBuild and network hops)
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 8000);
+  const timeoutId = setTimeout(() => controller.abort(), 16000);
 
   try {
     const getFileName = (lang) => {
@@ -189,11 +208,11 @@ async function runRemoteCompiler(code, language) {
           name: getFileName(language),
           content: code
         }
-      ]
+      ],
+      stdin: stdin || ''
     };
 
-    // Note: In production, redirect this to your own proxy endpoint: '/api/compile'
-    const response = await fetch(PISTON_API_URL, {
+    const response = await fetch(COMPILE_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -205,14 +224,17 @@ async function runRemoteCompiler(code, language) {
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Compiler API returned error code ${response.status}: ${errText}`);
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.error || `Compiler API returned status ${response.status}`);
     }
 
-    const data = await response.json();
+    const resData = await response.json();
+    if (!resData.ok) {
+      throw new Error(resData.error || 'Compilation proxy failed');
+    }
     
-    // Parse Piston response format
-    const runResult = data.run;
+    // Parse response format
+    const runResult = resData.data.run;
     const stdout = runResult.stdout || '';
     const stderr = runResult.stderr || '';
     const codeStatus = runResult.code; // Exit code
@@ -238,7 +260,7 @@ async function runRemoteCompiler(code, language) {
       success: false,
       output: '',
       error: err.name === 'AbortError' 
-        ? 'Compilation Error: Connection timed out. Piston API did not respond in 8 seconds.'
+        ? 'Compilation Error: Connection timed out. The compile service did not respond in 16 seconds.'
         : `Network Error: Failed to execute code run. details: ${err.message}`
     };
   }
