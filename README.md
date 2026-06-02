@@ -2,6 +2,9 @@
 
 **Real-time collaborative document editor** with CRDT conflict resolution, offline-first architecture, and operational event logging.
 
+🚀 **Live Demo**: [https://synccanvas-gc2d.onrender.com](https://synccanvas-gc2d.onrender.com)
+
+[![Demo](https://img.shields.io/badge/Render-Live%20Demo-blue?logo=render&logoColor=white)](https://synccanvas-gc2d.onrender.com)
 [![Node.js](https://img.shields.io/badge/Node.js-20+-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Yjs](https://img.shields.io/badge/CRDT-Yjs-6366f1?logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxMCIgY3k9IjEwIiByPSI4IiBmaWxsPSJ3aGl0ZSIvPjwvc3ZnPg==)](https://yjs.dev/)
 [![WebSocket](https://img.shields.io/badge/WebSocket-RFC%206455-3b82f6)](https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API)
