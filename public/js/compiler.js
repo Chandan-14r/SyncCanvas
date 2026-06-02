@@ -264,7 +264,7 @@ async function executeRemoteCompiler(code, language) {
   if (!config) return { success: false, error: `Language configuration missing for: ${language}` };
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 8000);
+  const timeoutId = setTimeout(() => controller.abort(), 16000);
 
   try {
     const getFileName = (lang) => {
@@ -319,7 +319,7 @@ async function executeRemoteCompiler(code, language) {
     return {
       success: false,
       error: err.name === 'AbortError' 
-        ? 'Connection Timeout: Piston execution service did not respond in 8 seconds.'
+        ? 'Connection Timeout: Wandbox compiler proxy did not respond in 16 seconds.'
         : `Execution Connection Failed: ${err.message}`
     };
   }

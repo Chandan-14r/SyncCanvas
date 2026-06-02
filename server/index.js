@@ -291,19 +291,43 @@ app.post('/api/rollback/:docId/:checkpointId', async (req, res) => {
  */
 app.post('/api/compile', async (req, res) => {
   try {
-    const { language, version, files } = req.body;
+    const { language, files } = req.body;
 
-    if (!language || !files || !Array.isArray(files)) {
+    if (!language || !files || !Array.isArray(files) || files.length === 0) {
       return res.status(400).json({ ok: false, error: 'Invalid compilation request payload' });
     }
 
-    const payload = { language, version, files };
+    const code = files[0].content;
+    if (typeof code !== 'string') {
+      return res.status(400).json({ ok: false, error: 'Missing code content' });
+    }
 
-    // Set up a fetch call with an abort timeout
+    // Map compiler IDs to Wandbox compilers
+    const compilerMapping = {
+      'python': 'cpython-3.12.7',
+      'python3': 'cpython-3.12.7',
+      'cpp': 'gcc-13.2.0',
+      'c++': 'gcc-13.2.0',
+      'c': 'gcc-13.2.0-c',
+      'csharp': 'dotnetcore-6.0.425',
+      'c#': 'dotnetcore-6.0.425'
+    };
+
+    const compilerId = compilerMapping[language.toLowerCase()];
+    if (!compilerId) {
+      return res.status(400).json({ ok: false, error: `Language '${language}' is not supported by the compile service.` });
+    }
+
+    const payload = {
+      compiler: compilerId,
+      code: code
+    };
+
+    // Set up a fetch call with an abort timeout of 15 seconds (C# template compilation can take up to 6 seconds)
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-    const response = await fetch('https://emkc.org/api/v2/piston/execute', {
+    const response = await fetch('https://wandbox.org/api/compile.json', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -320,14 +344,27 @@ app.post('/api/compile', async (req, res) => {
     }
 
     const data = await response.json();
-    res.json({ ok: true, data });
+
+    // Map Wandbox output back to Piston layout expected by client
+    const runResult = {
+      stdout: data.program_output || '',
+      stderr: data.compiler_error || data.program_error || '',
+      code: data.status !== undefined ? parseInt(data.status, 10) : 0
+    };
+
+    res.json({
+      ok: true,
+      data: {
+        run: runResult
+      }
+    });
 
   } catch (err) {
     logger.error('backend_compiler_proxy_error', { error: err.message });
     res.status(500).json({
       ok: false,
       error: err.name === 'AbortError'
-        ? 'Compiler API timeout (8 seconds expired)'
+        ? 'Compiler API timeout (15 seconds expired)'
         : `Compiler Connection Failed: ${err.message}`
     });
   }
