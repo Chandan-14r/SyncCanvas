@@ -6,6 +6,7 @@ import { initRollbackUI } from './rollback-ui.js';
 import { initDebugPanel } from './debug.js';
 import { initCompiler } from './compiler.js';
 import { initWhiteboard } from './whiteboard.js';
+import { initVoice } from './voice.js';
 
 // --- URL Router ---
 // Parse location.pathname to get the document ID directly from the path (e.g. /my-custom-name).
@@ -183,6 +184,9 @@ async function init() {
 
   // Initialize Collaborative Whiteboard
   initWhiteboard(provider, ydoc, docId);
+
+  // Initialize Collaborative Voice calling
+  initVoice(provider, ydoc, docId);
 
   // Initialize Workspace Tab Switcher
   initWorkspaceTabs(quill);

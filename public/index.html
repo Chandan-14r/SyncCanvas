@@ -275,6 +275,21 @@
       <ul class="user-list" id="user-list">
         <!-- Live active users will be populated here -->
       </ul>
+
+      <!-- Sidebar Voice Calling Panel -->
+      <div class="sidebar-voice-panel" id="sidebar-voice-panel">
+        <div class="voice-panel-header">
+          <span>📞 Room Audio Channel</span>
+        </div>
+        <div class="voice-panel-body">
+          <button class="btn btn-primary voice-btn" id="voice-join-btn">Join Call</button>
+          <button class="btn btn-ghost voice-btn-control" id="voice-mute-btn" title="Mute Microphone" style="display: none;" disabled>
+            🎙️ Mute
+          </button>
+        </div>
+      </div>
+      <!-- Hidden audio streams placeholder -->
+      <div id="audio-streams-container" style="display: none;"></div>
     </aside>
   </main>
 

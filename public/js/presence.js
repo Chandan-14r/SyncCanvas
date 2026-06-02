@@ -73,16 +73,16 @@ export function initPresence(provider, quill) {
 
     // Add self to user list first
     let listHtml = `
-      <li class="user-item self">
-        <span class="user-avatar" style="background:${localColor}">${localName[0]}</span>
+      <li class="user-item self" data-client-id="${awareness.clientID}">
+        <span class="user-avatar" id="avatar-${awareness.clientID}" style="background:${localColor}">${localName[0]}</span>
         <span class="user-name">${localName} (You)</span>
       </li>
     `;
 
     // Append other active users
     listHtml += activeUsers.map(u => `
-      <li class="user-item">
-        <span class="user-avatar" style="background:${u.color}">${u.name[0]}</span>
+      <li class="user-item" data-client-id="${u.clientId}">
+        <span class="user-avatar" id="avatar-${u.clientId}" style="background:${u.color}">${u.name[0]}</span>
         <span class="user-name">${u.name}</span>
         <span class="user-status">editing</span>
       </li>

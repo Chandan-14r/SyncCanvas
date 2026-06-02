@@ -2063,6 +2063,66 @@ body {
   fill: #fff;
 }
 
+/* ==========================================================================
+   WebRTC In-App Voice Call Styles
+   ========================================================================== */
+
+.sidebar-voice-panel {
+  padding: 16px 20px;
+  background: var(--bg-card);
+  border-top: var(--border-glass);
+  margin-top: auto; /* Push to bottom of sidebar flex column */
+  z-index: 10;
+}
+
+.voice-panel-header {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 12px;
+}
+
+.voice-panel-body {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.voice-btn {
+  flex: 1;
+  font-size: 0.8rem !important;
+  padding: 8px 12px !important;
+}
+
+.voice-btn-control {
+  font-size: 0.8rem !important;
+  padding: 8px 12px !important;
+  border: 1px solid var(--border-color) !important;
+}
+
+.voice-btn-control.active {
+  background: var(--color-danger);
+  color: #fff;
+  border-color: var(--color-danger) !important;
+}
+
+/* Speaking Volume Threshold Indicator Ring */
+.user-avatar.speaking {
+  outline: 2px solid var(--color-online);
+  box-shadow: 0 0 10px var(--color-online);
+  animation: voice-glow 1.2s infinite ease-in-out;
+}
+
+@keyframes voice-glow {
+  0% { box-shadow: 0 0 4px var(--color-online); }
+  50% { box-shadow: 0 0 12px var(--color-online); }
+  100% { box-shadow: 0 0 4px var(--color-online); }
+}
+
+
 
 
 

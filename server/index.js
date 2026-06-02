@@ -694,6 +694,36 @@ wss.on('connection', (ws, req) => {
   // Hand off to y-websocket.
   setupWSConnection(ws, req, { docName });
 
+  // WebRTC Signaling Relay
+  ws.on('message', (message) => {
+    try {
+      let dataStr = '';
+      if (typeof message === 'string') {
+        dataStr = message;
+      } else if (message instanceof Buffer || Buffer.isBuffer(message)) {
+        dataStr = message.toString();
+      } else {
+        return;
+      }
+
+      if (dataStr.startsWith('{')) {
+        const msg = JSON.parse(dataStr);
+        if (msg.type && msg.type.startsWith('webrtc-')) {
+          const doc = docs.get(docName);
+          if (doc && doc.conns) {
+            doc.conns.forEach((_, conn) => {
+              if (conn !== ws && conn.readyState === WebSocket.OPEN) {
+                conn.send(dataStr);
+              }
+            });
+          }
+        }
+      }
+    } catch (e) {
+      // Ignore parse/relay errors (e.g. binary Yjs updates)
+    }
+  });
+
   // Track connection in document manager.
   documentManager.incrementConnections(docName);
   metrics.increment('totalConnections');
