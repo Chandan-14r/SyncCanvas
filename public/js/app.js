@@ -4,6 +4,7 @@ import { initPresence } from './presence.js';
 import { initOffline } from './offline.js';
 import { initRollbackUI } from './rollback-ui.js';
 import { initDebugPanel } from './debug.js';
+import { initCompiler } from './compiler.js';
 
 // --- URL Router ---
 // Parse location.pathname to get the document ID directly from the path (e.g. /my-custom-name).
@@ -175,6 +176,47 @@ async function init() {
 
   // Initialize Live Network Jitter Simulation
   initDebugPanel(provider);
+
+  // Initialize Collaborative Code Compiler
+  initCompiler(provider, ydoc, quill);
+
+  // Initialize Workspace Tab Switcher
+  initWorkspaceTabs(quill);
+}
+
+// --- Workspace Tabs Navigation ---
+function initWorkspaceTabs(quill) {
+  const tabsContainer = document.getElementById('workspace-tabs');
+  const tabPlainText = document.getElementById('tab-plain-text');
+  const tabCodeCompiler = document.getElementById('tab-code-compiler');
+  
+  const notepadWorkspace = document.getElementById('notepad-workspace');
+  const compilerWorkspace = document.getElementById('compiler-workspace');
+
+  if (!tabsContainer || !tabPlainText || !tabCodeCompiler || !notepadWorkspace || !compilerWorkspace) return;
+
+  // Show tabs container
+  tabsContainer.hidden = false;
+
+  tabPlainText.addEventListener('click', () => {
+    tabPlainText.classList.add('active');
+    tabCodeCompiler.classList.remove('active');
+    notepadWorkspace.style.display = 'block';
+    compilerWorkspace.style.display = 'none';
+    if (quill) {
+      quill.update();
+    }
+  });
+
+  tabCodeCompiler.addEventListener('click', () => {
+    tabCodeCompiler.classList.add('active');
+    tabPlainText.classList.remove('active');
+    notepadWorkspace.style.display = 'none';
+    compilerWorkspace.style.display = 'block';
+    if (window.codeMirrorInstance) {
+      window.codeMirrorInstance.refresh();
+    }
+  });
 }
 
 // Global error boundaries

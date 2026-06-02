@@ -22,6 +22,14 @@
   <script src="/node_modules/quill/dist/quill.js"></script>
   <script src="/node_modules/quill-cursors/dist/quill-cursors.js"></script>
   <script src="/node_modules/dompurify/dist/purify.min.js"></script>
+
+  <!-- CodeMirror 5 (Served via CDN for editor syntax) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/dracula.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/javascript/javascript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/python/python.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/clike/clike.min.js"></script>
   
   <!-- Import map for ES modules -->
   <script type="importmap">
@@ -91,11 +99,55 @@
     </div>
   </header>
 
+  <!-- Workspace Switcher Tabs -->
+  <div class="workspace-tabs-container" id="workspace-tabs" hidden>
+    <button class="workspace-tab active" id="tab-plain-text">📝 Plain Text</button>
+    <button class="workspace-tab" id="tab-code-compiler">💻 Code Compiler</button>
+  </div>
+
   <!-- Main Work Space -->
   <main class="app-layout">
-    <!-- Quill Rich Text Editor Section -->
-    <section class="editor-section">
+    <!-- Quill Rich Text Editor Section (Notepad Workspace) -->
+    <section class="editor-section" id="notepad-workspace">
       <div id="editor-container"></div>
+    </section>
+
+    <!-- Code Compiler Workspace Section -->
+    <section class="editor-section" id="compiler-workspace" style="display: none;">
+      <div class="compiler-layout">
+        <!-- Code Editor Pane -->
+        <div class="compiler-editor-container">
+          <div class="compiler-toolbar">
+            <span class="compiler-title">💻 Code Workspace</span>
+            <div class="compiler-controls">
+              <select class="compiler-select" id="compiler-language">
+                <option value="javascript">JavaScript (Node.js)</option>
+                <option value="python">Python 3</option>
+                <option value="c">C (GCC 10)</option>
+                <option value="cpp">C++ (GCC 10)</option>
+                <option value="csharp">C# (Mono 6.12)</option>
+              </select>
+              <button class="btn btn-primary" id="compiler-run-btn">
+                ⚡ Run Code
+              </button>
+            </div>
+          </div>
+          <div class="code-editor-wrapper">
+            <textarea id="code-textarea"></textarea>
+          </div>
+        </div>
+
+        <!-- Terminal Output Pane -->
+        <div class="compiler-terminal-container">
+          <div class="terminal-header">
+            <span>Terminal Output</span>
+            <button class="terminal-clear" id="terminal-clear-btn">Clear Logs</button>
+          </div>
+          <div class="terminal-console" id="terminal-console">
+            <div class="terminal-placeholder">Click "Run Code" to compile and execute your script. Logs will appear here...</div>
+          </div>
+        </div>
+      </div>
     </section>
 
     <!-- Presence sidebar (right) -->
