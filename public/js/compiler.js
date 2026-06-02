@@ -131,24 +131,64 @@ export function initCompiler(provider, ydoc, quill, docId) {
       return;
     }
 
-    const stdinValue = stdinTextarea?.value || '';
+    let stdinValue = stdinTextarea?.value || '';
 
-    // Pre-run Stdin Validation Heuristics
+    // Interactive Stdin Prompt if empty and code expects input
     if (!stdinValue.trim() && detectStdinExpectation(code, activeLang)) {
-      if (stdinContainer) {
-        stdinContainer.classList.add('warning-highlight');
+      const inputs = [];
+      let cancelled = false;
+
+      if (activeLang === 'python') {
+        const pythonPrompts = extractPythonPrompts(code);
+        if (pythonPrompts.length > 0) {
+          for (let i = 0; i < pythonPrompts.length; i++) {
+            const val = prompt(`[Python Program Input Required]\n\n${pythonPrompts[i]}`);
+            if (val === null) {
+              cancelled = true;
+              break;
+            }
+            inputs.push(val);
+          }
+        } else {
+          const val = prompt("[Python Program Input Required]\n\nThis code calls input(), but no stdin values were provided. Please enter input value(s):");
+          if (val === null) cancelled = true;
+          else inputs.push(val);
+        }
+      } else if (activeLang === 'javascript') {
+        const jsPrompts = extractJsPrompts(code);
+        if (jsPrompts.length > 0) {
+          for (let i = 0; i < jsPrompts.length; i++) {
+            const val = prompt(`[JavaScript Program Input Required]\n\n${jsPrompts[i]}`);
+            if (val === null) {
+              cancelled = true;
+              break;
+            }
+            inputs.push(val);
+          }
+        } else {
+          const val = prompt("[JavaScript Program Input Required]\n\nThis code calls prompt(), but no stdin values were provided. Please enter input value(s):");
+          if (val === null) cancelled = true;
+          else inputs.push(val);
+        }
+      } else {
+        // C, C++, C#
+        const langNames = { cpp: 'C++', c: 'C', csharp: 'C#' };
+        const langName = langNames[activeLang] || activeLang;
+        const val = prompt(`[${langName} Program Input Required]\n\nThis program expects standard input (stdin). Please enter your input values (separate multiple inputs with newlines):`);
+        if (val === null) cancelled = true;
+        else inputs.push(val);
       }
-      if (stdinWarningMsg) {
-        stdinWarningMsg.style.display = 'inline';
+
+      if (cancelled) {
+        showTerminalOutput('', 'Execution Cancelled: Stdin inputs were not provided.', 'info');
+        return;
       }
-      stdinTextarea?.focus();
-      
-      showTerminalOutput(
-        '', 
-        '⚠️ Execution Bypassed: This code expects input, but the Program Input panel is empty.\n\nPlease enter inputs (e.g. 153) in the Program Input panel on the right, then run again.', 
-        'warning-info'
-      );
-      return;
+
+      stdinValue = inputs.join('\n');
+      if (stdinTextarea) {
+        stdinTextarea.value = stdinValue;
+        stdinTextarea.dispatchEvent(new Event('input'));
+      }
     }
 
     setTerminalRunning(true);
@@ -500,12 +540,52 @@ async function executeRemoteCompiler(code, language, stdin = '') {
 }
 
 /**
+ * Strip comments from code to avoid false positives in detection and extraction.
+ */
+function cleanComments(code, language) {
+  if (!code) return '';
+  if (language === 'python') {
+    return code.replace(/#.*$/gm, '');
+  }
+  return code.replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, '$1');
+}
+
+/**
+ * Extract prompt strings from python input("prompt") calls.
+ */
+function extractPythonPrompts(code) {
+  const cleanCode = cleanComments(code, 'python');
+  const prompts = [];
+  const regex = /input\s*\(\s*(["'])([\s\S]*?)\1\s*\)/g;
+  let match;
+  while ((match = regex.exec(cleanCode)) !== null && prompts.length < 10) {
+    let p = match[2].replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\"/g, '"').replace(/\\'/g, "'");
+    prompts.push(p);
+  }
+  return prompts;
+}
+
+/**
+ * Extract prompt strings from javascript prompt("prompt") calls.
+ */
+function extractJsPrompts(code) {
+  const cleanCode = cleanComments(code, 'javascript');
+  const prompts = [];
+  const regex = /prompt\s*\(\s*(["'])([\s\S]*?)\1\s*\)/g;
+  let match;
+  while ((match = regex.exec(cleanCode)) !== null && prompts.length < 10) {
+    let p = match[2].replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\"/g, '"').replace(/\\'/g, "'");
+    prompts.push(p);
+  }
+  return prompts;
+}
+
+/**
  * Lightweight helper to detect if a source code string likely expects standard inputs.
  */
 function detectStdinExpectation(code, language) {
   if (!code) return false;
-  // Remove comments (single line // and multi-line /* */) to avoid false positives
-  const cleanCode = code.replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, '');
+  const cleanCode = cleanComments(code, language);
 
   switch (language) {
     case 'python':
