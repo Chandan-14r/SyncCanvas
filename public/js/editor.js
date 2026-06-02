@@ -62,8 +62,19 @@ export async function initEditor(docId) {
   // 6. Bind Yjs to Quill Editor
   const binding = new QuillBinding(ytext, quill, provider.awareness);
 
-  // 7. Track Connection Badges
+  // 7. Track Connection Badges & Cold Start Warnings
+  let isFirstConnection = true;
+  let connectionTimeout = setTimeout(() => {
+    if (isFirstConnection) {
+      window.showToast?.('Waking up the cloud server (this can take 30-50s on Render free tier)...', 'info', 10000);
+    }
+  }, 4500);
+
   provider.on('status', ({ status }) => {
+    if (status === 'connected') {
+      isFirstConnection = false;
+      clearTimeout(connectionTimeout);
+    }
     updateConnectionUI(status);
   });
 
