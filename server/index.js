@@ -408,6 +408,167 @@ app.post('/api/compile', async (req, res) => {
 });
 
 /**
+ * POST /api/ai/stream — SSE endpoint to stream code generation from Gemini API.
+ * Features automated character-by-character typing simulation fallback if process.env.GEMINI_API_KEY is not defined.
+ */
+app.post('/api/ai/stream', async (req, res) => {
+  let intervalId = null;
+  try {
+    const { prompt, code, language } = req.body;
+    if (!prompt) {
+      return res.status(400).json({ ok: false, error: 'Prompt is required' });
+    }
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    if (apiKey) {
+      const systemInstruction = "You are an expert programming copilot. Generate clean, functional code based on the instructions. Return ONLY the code block itself. DO NOT wrap it in markdown code blocks like ```python ... ```, write no explanations, and no descriptions.";
+      
+      const payload = {
+        contents: [
+          {
+            parts: [{ text: `Language: ${language}\nExisting Code Context:\n${code}\n\nTask: ${prompt}` }]
+          }
+        ],
+        systemInstruction: {
+          parts: [{ text: systemInstruction }]
+        }
+      };
+
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        res.write(`data: ${JSON.stringify({ error: `Gemini API error: ${errText}` })}\n\n`);
+        res.end();
+        return;
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      const textRegex = /"text"\s*:\s*"((?:[^"\\]|\\.)*)"/g;
+      let lastIndex = 0;
+      let textBuffer = '';
+
+      req.on('close', () => {
+        reader.cancel().catch(() => {});
+      });
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        textBuffer += decoder.decode(value, { stream: true });
+        let match;
+        textRegex.lastIndex = lastIndex;
+
+        while ((match = textRegex.exec(textBuffer)) !== null) {
+          lastIndex = textRegex.lastIndex;
+          let textVal = '';
+          try {
+            textVal = JSON.parse(`"${match[1]}"`);
+          } catch {
+            textVal = match[1];
+          }
+          if (textVal) {
+            res.write(`data: ${JSON.stringify({ text: textVal })}\n\n`);
+          }
+        }
+      }
+
+      res.write(`data: [DONE]\n\n`);
+      res.end();
+
+    } else {
+      // Mock typing simulator fallback mode
+      const promptLower = prompt.toLowerCase();
+      const langLower = (language || 'javascript').toLowerCase();
+      let codeTemplate = '';
+
+      if (promptLower.includes('quicksort') || promptLower.includes('quick')) {
+        if (langLower === 'python') {
+          codeTemplate = `def quicksort(arr):\n    if len(arr) <= 1:\n        return arr\n    pivot = arr[len(arr) // 2]\n    left = [x for x in arr if x < pivot]\n    middle = [x for x in arr if x == pivot]\n    right = [x for x in arr if x > pivot]\n    return quicksort(left) + middle + quicksort(right)\n\n# Execution Test\nprint("Sorted list:", quicksort([3, 6, 8, 10, 1, 2, 1]))\n`;
+        } else if (langLower === 'cpp' || langLower === 'c') {
+          codeTemplate = `// Quicksort implementation in C/C++\nvoid swap(int* a, int* b) {\n    int t = *a;\n    *a = *b;\n    *b = t;\n}\n\nint partition(int arr[], int low, int high) {\n    int pivot = arr[high];\n    int i = (low - 1);\n    for (int j = low; j <= high - 1; j++) {\n        if (arr[j] < pivot) {\n            i++;\n            swap(&arr[i], &arr[j]);\n        }\n    }\n    swap(&arr[i + 1], &arr[high]);\n    return (i + 1);\n}\n\nvoid quicksort(int arr[], int low, int high) {\n    if (low < high) {\n        int pi = partition(arr, low, high);\n        quicksort(arr, low, pi - 1);\n        quicksort(arr, pi + 1, high);\n    }\n}\n`;
+        } else {
+          codeTemplate = `function quicksort(arr) {\n  if (arr.length <= 1) return arr;\n  const pivot = arr[Math.floor(arr.length / 2)];\n  const left = arr.filter(x => x < pivot);\n  const middle = arr.filter(x => x === pivot);\n  const right = arr.filter(x => x > pivot);\n  return [...quicksort(left), ...middle, ...quicksort(right)];\n}\n\nconsole.log("Sorted Array:", quicksort([3, 6, 8, 10, 1, 2, 1]));\n`;
+        }
+      } else if (promptLower.includes('bubble') || promptLower.includes('sort')) {
+        if (langLower === 'python') {
+          codeTemplate = `def bubblesort(arr):\n    n = len(arr)\n    for i in range(n):\n        for j in range(0, n-i-1):\n            if arr[j] > arr[j+1]:\n                arr[j], arr[j+1] = arr[j+1], arr[j]\n    return arr\n\nprint(bubblesort([64, 34, 25, 12, 22, 11, 90]))\n`;
+        } else {
+          codeTemplate = `function bubbleSort(arr) {\n  let len = arr.length;\n  for (let i = 0; i < len; i++) {\n    for (let j = 0; j < len - i - 1; j++) {\n      if (arr[j] > arr[j + 1]) {\n        let temp = arr[j];\n        arr[j] = arr[j + 1];\n        arr[j + 1] = temp;\n      }\n    }\n  }\n  return arr;\n}\n\nconsole.log(bubbleSort([64, 34, 25, 12, 22, 11, 90]));\n`;
+        }
+      } else if (promptLower.includes('binary') || promptLower.includes('search')) {
+        if (langLower === 'python') {
+          codeTemplate = `def binary_search(arr, x):\n    low = 0\n    high = len(arr) - 1\n    while low <= high:\n        mid = (high + low) // 2\n        if arr[mid] < x:\n            low = mid + 1\n        elif arr[mid] > x:\n            high = mid - 1\n        else:\n            return mid\n    return -1\n\nprint("Element index:", binary_search([2, 3, 4, 10, 40], 10))\n`;
+        } else {
+          codeTemplate = `function binarySearch(arr, x) {\n  let low = 0, high = arr.length - 1;\n  while (low <= high) {\n    let mid = Math.floor((low + high) / 2);\n    if (arr[mid] < x) low = mid + 1;\n    else if (arr[mid] > x) high = mid - 1;\n    else return mid;\n  }\n  return -1;\n}\n\nconsole.log("Element index:", binarySearch([2, 3, 4, 10, 40], 10));\n`;
+        }
+      } else if (promptLower.includes('fibo') || promptLower.includes('fibonacci')) {
+        if (langLower === 'python') {
+          codeTemplate = `def fibonacci(n):\n    if n <= 0: return []\n    if n == 1: return [0]\n    fib = [0, 1]\n    while len(fib) < n:\n        fib.append(fib[-1] + fib[-2])\n    return fib\n\nprint(fibonacci(10))\n`;
+        } else {
+          codeTemplate = `function fibonacci(n) {\n  if (n <= 0) return [];\n  if (n === 1) return [0];\n  let fib = [0, 1];\n  while (fib.length < n) {\n    fib.push(fib[fib.length - 1] + fib[fib.length - 2]);\n  }\n  return fib;\n}\n\nconsole.log(fibonacci(10));\n`;
+        }
+      } else if (promptLower.includes('hello')) {
+        if (langLower === 'python') {
+          codeTemplate = `print("Hello from SyncCanvas AI Assistant!")\n`;
+        } else if (langLower === 'cpp') {
+          codeTemplate = `#include <iostream>\nusing namespace std;\n\nint main() {\n    cout << "Hello from SyncCanvas AI Assistant!" << endl;\n    return 0;\n}\n`;
+        } else if (langLower === 'c') {
+          codeTemplate = `#include <stdio.h>\n\nint main() {\n    printf("Hello from SyncCanvas AI Assistant!\\\\n");\n    return 0;\n}\n`;
+        } else if (langLower === 'csharp') {
+          codeTemplate = `using System;\n\nclass Program {\n    static void Main() {\n        Console.WriteLine("Hello from SyncCanvas AI Assistant!");\n    }\n}\n`;
+        } else {
+          codeTemplate = `console.log("Hello from SyncCanvas AI Assistant!");\n`;
+        }
+      } else {
+        if (langLower === 'python') {
+          codeTemplate = `# AI generated script for: ${prompt.replace(/\n/g, ' ')}\nprint("AI Task Complete: '${prompt.replace(/"/g, '\\"')}'")\n`;
+        } else {
+          codeTemplate = `// AI generated script for: ${prompt.replace(/\n/g, ' ')}\nconsole.log("AI Task Complete: '${prompt.replace(/"/g, '\\"')}'");\n`;
+        }
+      }
+
+      let charIndex = 0;
+      const charsPerChunk = 5;
+
+      intervalId = setInterval(() => {
+        if (charIndex >= codeTemplate.length) {
+          clearInterval(intervalId);
+          res.write(`data: [DONE]\n\n`);
+          res.end();
+          return;
+        }
+
+        const chunk = codeTemplate.slice(charIndex, charIndex + charsPerChunk);
+        charIndex += charsPerChunk;
+        res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
+      }, 25);
+
+      req.on('close', () => {
+        if (intervalId) clearInterval(intervalId);
+      });
+    }
+
+  } catch (err) {
+    if (intervalId) clearInterval(intervalId);
+    logger.error('backend_ai_stream_error', { error: err.message });
+    res.write(`data: ${JSON.stringify({ error: err.message })}\n\n`);
+    res.end();
+  }
+});
+
+/**
  * GET /api/stats — server observability endpoint.
  */
 app.get('/api/stats', (_req, res) => {

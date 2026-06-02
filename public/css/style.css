@@ -1848,6 +1848,52 @@ body {
   border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
+/* AI Collaborator Typing Cursor Styles */
+.ai-typing-selection {
+  background: rgba(168, 85, 247, 0.25) !important;
+  border-left: 2px solid #a855f7 !important;
+  animation: ai-cursor-blink 1s infinite;
+}
+
+@keyframes ai-cursor-blink {
+  0%, 100% { border-left-color: #a855f7; }
+  50% { border-left-color: transparent; }
+}
+
+.ai-virtual-cursor {
+  position: relative;
+  display: inline-block;
+  width: 0;
+  height: 0;
+}
+
+.ai-cursor-line {
+  position: absolute;
+  left: 0;
+  top: -2px;
+  width: 2px;
+  height: 18px;
+  background: #a855f7;
+  animation: ai-cursor-blink 1s infinite;
+}
+
+.ai-cursor-label {
+  position: absolute;
+  left: 0;
+  top: -20px;
+  background: #a855f7;
+  color: #fff;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 50;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
 
 
 

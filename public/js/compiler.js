@@ -20,6 +20,8 @@ let currentObserveFn = null;
 let currentChangeFn = null;
 let currentTextObject = null;
 let ytestcases = null;
+let ymetaRef = null;
+let aiMarker = null;
 
 /**
  * Helper to determine file icon matching extension
@@ -94,7 +96,32 @@ export function initCompiler(provider, ydoc, quill, docId) {
   // 2. Obtain Yjs Shared Types
   yfiles = ydoc.getMap('workspace_files');
   const ymeta = ydoc.getMap('metadata');
+  ymetaRef = ymeta;
   const ycode = ydoc.getText('code'); // for backward compatibility/migration
+
+  // Listen to remote changes to draw the virtual AI cursor
+  ymetaRef.observe((event) => {
+    const aiActive = ymetaRef.get('ai_active');
+    
+    // Clear old marker if any
+    if (aiMarker) {
+      aiMarker.clear();
+      aiMarker = null;
+    }
+    
+    if (aiActive) {
+      const { filename, index } = aiActive;
+      if (filename === activeFile && editorInstance) {
+        const pos = editorInstance.posFromIndex(index);
+        
+        const cursorEl = document.createElement('span');
+        cursorEl.className = 'ai-virtual-cursor';
+        cursorEl.innerHTML = '<span class="ai-cursor-line"></span><span class="ai-cursor-label">🤖 AI Copilot</span>';
+        
+        aiMarker = editorInstance.setBookmark(pos, { widget: cursorEl });
+      }
+    }
+  });
 
   // 3. Migrate single-file code if yfiles is empty
   const languageDropdown = document.getElementById('compiler-language');
@@ -241,6 +268,55 @@ export function initCompiler(provider, ydoc, quill, docId) {
   }
 
   renderTestCases();
+
+  // 7.6 Setup AI Copilot Overlay Events & Hotkeys
+  const aiOverlay = document.getElementById('ai-prompt-overlay');
+  const aiInput = document.getElementById('ai-prompt-input');
+  const closeAiBtn = document.getElementById('btn-close-ai-prompt');
+  const cancelAiBtn = document.getElementById('btn-cancel-ai-prompt');
+  const submitAiBtn = document.getElementById('btn-submit-ai-prompt');
+  const aiOverlayBg = document.getElementById('ai-prompt-overlay-bg');
+  const aiBtn = document.getElementById('compiler-ai-btn');
+
+  function openAiPromptOverlay() {
+    if (aiOverlay) {
+      aiOverlay.removeAttribute('hidden');
+      if (aiInput) {
+        aiInput.value = '';
+        setTimeout(() => aiInput.focus(), 50);
+      }
+    }
+  }
+
+  function closeAiPromptOverlay() {
+    if (aiOverlay) {
+      aiOverlay.setAttribute('hidden', '');
+    }
+  }
+
+  if (aiBtn) aiBtn.addEventListener('click', openAiPromptOverlay);
+  if (closeAiBtn) closeAiBtn.addEventListener('click', closeAiPromptOverlay);
+  if (cancelAiBtn) cancelAiBtn.addEventListener('click', closeAiPromptOverlay);
+  if (aiOverlayBg) aiOverlayBg.addEventListener('click', closeAiPromptOverlay);
+
+  // Bind Ctrl-Space shortcut inside CodeMirror
+  editor.setOption('extraKeys', {
+    'Ctrl-Space': () => {
+      openAiPromptOverlay();
+    }
+  });
+
+  if (submitAiBtn) {
+    submitAiBtn.addEventListener('click', async () => {
+      const promptText = aiInput ? aiInput.value.trim() : '';
+      if (!promptText) {
+        showToast('Please type a prompt instruction.', 'warning');
+        return;
+      }
+      closeAiPromptOverlay();
+      await runAiCopilotStreaming(promptText);
+    });
+  }
 
   // 8. Code Execution Controls
   const runBtn = document.getElementById('compiler-run-btn');
@@ -1515,5 +1591,118 @@ async function runTestCaseSuite() {
   } finally {
     runTestcasesBtn.disabled = false;
     runTestcasesBtn.innerHTML = '🧪 Run Test Cases';
+  }
+}
+
+/**
+ * Request Backend AI SSE stream to type code into CodeMirror collaboratively
+ */
+async function runAiCopilotStreaming(promptText) {
+  const code = editorInstance ? editorInstance.getValue() : '';
+  const activeLang = document.getElementById('compiler-language').value;
+  const cursorIndex = editorInstance ? editorInstance.indexFromPos(editorInstance.getCursor()) : 0;
+
+  showToast('AI Collaborator thinking...', 'info', 2000);
+
+  const aiBtn = document.getElementById('compiler-ai-btn');
+  const originalText = aiBtn ? aiBtn.innerHTML : '🤖 AI Copilot';
+  if (aiBtn) {
+    aiBtn.disabled = true;
+    aiBtn.innerHTML = '🤖 Thinking...';
+  }
+
+  let textInsertedCount = 0;
+  const ytext = yfiles.get(activeFile);
+  if (!ytext) {
+    if (aiBtn) {
+      aiBtn.disabled = false;
+      aiBtn.innerHTML = originalText;
+    }
+    return;
+  }
+
+  // Broadcast initial cursor position
+  ydocRef.transact(() => {
+    ymetaRef.set('ai_active', {
+      filename: activeFile,
+      index: cursorIndex
+    });
+  });
+
+  try {
+    const response = await fetch('/api/ai/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: promptText,
+        code: code,
+        language: activeLang
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`AI Service returned status ${response.status}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop(); // save incomplete line
+
+      for (const line of lines) {
+        const cleanLine = line.trim();
+        if (!cleanLine.startsWith('data:')) continue;
+
+        const dataStr = cleanLine.slice(5).trim();
+        if (dataStr === '[DONE]') {
+          break;
+        }
+
+        try {
+          const parsed = JSON.parse(dataStr);
+          if (parsed.error) {
+            throw new Error(parsed.error);
+          }
+          if (parsed.text) {
+            const insertChunk = parsed.text;
+            ydocRef.transact(() => {
+              ytext.insert(cursorIndex + textInsertedCount, insertChunk);
+              textInsertedCount += insertChunk.length;
+
+              // Broadcast updated cursor position
+              ymetaRef.set('ai_active', {
+                filename: activeFile,
+                index: cursorIndex + textInsertedCount
+              });
+            });
+          }
+        } catch (e) {
+          // Incomplete chunk parse error, ignore
+        }
+      }
+    }
+
+    showToast('AI Copilot typing finished!', 'success', 3000);
+
+  } catch (err) {
+    console.error('AI streaming error:', err);
+    showToast(`AI generation failed: ${err.message}`, 'error', 5000);
+  } finally {
+    // Clear AI virtual cursor
+    ydocRef.transact(() => {
+      ymetaRef.delete('ai_active');
+    });
+
+    if (aiBtn) {
+      aiBtn.disabled = false;
+      aiBtn.innerHTML = originalText;
+    }
   }
 }

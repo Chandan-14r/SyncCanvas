@@ -133,6 +133,9 @@
               <button class="btn btn-secondary" id="compiler-download-btn" title="Download code file to local computer">
                 📥 Download Code
               </button>
+              <button class="btn btn-secondary" id="compiler-ai-btn" title="Ask AI Copilot to generate code (Ctrl + Space)">
+                🤖 AI Copilot
+              </button>
               <button class="btn btn-primary" id="compiler-run-btn">
                 ⚡ Run Code
               </button>
@@ -278,6 +281,25 @@
       <div class="metric"><span>Connection Status</span><strong id="debug-conn-status">🟢 Online</strong></div>
       <div class="metric"><span>Messages Sent</span><strong id="debug-msg-sent">0</strong></div>
       <div class="metric"><span>Messages Dropped</span><strong id="debug-msg-dropped">0</strong></div>
+    </div>
+  </div>
+
+  <!-- AI Prompt Box Overlay -->
+  <div class="rollback-preview" id="ai-prompt-overlay" hidden>
+    <div class="preview-overlay" id="ai-prompt-overlay-bg"></div>
+    <div class="preview-modal" style="max-width: 500px;">
+      <div class="preview-header">
+        <h3>🤖 AI Collaborator Prompt</h3>
+        <button class="btn btn-ghost" id="btn-close-ai-prompt" style="font-size: 1.1rem; padding: 0 4px;">✕</button>
+      </div>
+      <div class="custom-prompt-body" style="padding: 20px;">
+        <span class="custom-prompt-label">Enter instructions for the AI virtual collaborator (e.g. "write a quicksort", "fix compilation bugs"):</span>
+        <textarea class="custom-prompt-textarea" id="ai-prompt-input" rows="4" placeholder="Type prompt here... e.g. quicksort"></textarea>
+      </div>
+      <div class="custom-prompt-actions" style="padding: 16px 20px;">
+        <button class="btn btn-primary" id="btn-submit-ai-prompt">⚡ Generate & Type Code</button>
+        <button class="btn btn-ghost" id="btn-cancel-ai-prompt">Cancel</button>
+      </div>
     </div>
   </div>
 
