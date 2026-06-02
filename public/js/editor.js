@@ -64,6 +64,7 @@ export async function initEditor(docId) {
 
   // 7. Track Connection Badges & Cold Start Warnings
   let isFirstConnection = true;
+  let hasConnectedOnce = false;
   let connectionTimeout = setTimeout(() => {
     if (isFirstConnection) {
       window.showToast?.('Waking up the cloud server (this can take 30-50s on Render free tier)...', 'info', 10000);
@@ -74,14 +75,17 @@ export async function initEditor(docId) {
     if (status === 'connected') {
       isFirstConnection = false;
       clearTimeout(connectionTimeout);
+      updateConnectionUI(status, hasConnectedOnce);
+      hasConnectedOnce = true;
+    } else {
+      updateConnectionUI(status, hasConnectedOnce);
     }
-    updateConnectionUI(status);
   });
 
   return { provider, ydoc, quill, binding };
 }
 
-function updateConnectionUI(status) {
+function updateConnectionUI(status, hasConnectedOnce) {
   const badge = document.getElementById('connection-badge');
   const dot = badge.querySelector('.connection-dot');
   const text = badge.querySelector('.connection-text');
@@ -89,15 +93,21 @@ function updateConnectionUI(status) {
   if (status === 'connected') {
     badge.className = 'connection-badge connected';
     text.textContent = 'Online';
-    window.showToast?.('Connected — syncing real-time edits', 'success', 2500);
+    if (hasConnectedOnce) {
+      window.showToast?.('Connected — syncing real-time edits', 'success', 2500);
+    }
   } else if (status === 'connecting') {
     badge.className = 'connection-badge reconnecting';
     text.textContent = 'Reconnecting...';
-    window.showToast?.('Connection lost — attempting reconnection', 'warning', 3000);
+    if (hasConnectedOnce) {
+      window.showToast?.('Connection lost — attempting reconnection', 'warning', 3000);
+    }
   } else {
     badge.className = 'connection-badge disconnected';
     text.textContent = 'Offline';
-    window.showToast?.('Offline — saving changes locally', 'error', 4000);
+    if (hasConnectedOnce) {
+      window.showToast?.('Offline — saving changes locally', 'error', 4000);
+    }
   }
 }
 

@@ -286,6 +286,54 @@ app.post('/api/rollback/:docId/:checkpointId', async (req, res) => {
 });
 
 /**
+ * POST /api/compile — Proxy route to run code via EMKC Piston compilation engine.
+ * Bypasses browser CORS policy and secures external requests.
+ */
+app.post('/api/compile', async (req, res) => {
+  try {
+    const { language, version, files } = req.body;
+
+    if (!language || !files || !Array.isArray(files)) {
+      return res.status(400).json({ ok: false, error: 'Invalid compilation request payload' });
+    }
+
+    const payload = { language, version, files };
+
+    // Set up a fetch call with an abort timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+    const response = await fetch('https://emkc.org/api/v2/piston', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errText = await response.text();
+      return res.status(response.status).json({ ok: false, error: `Compiler API error: ${errText}` });
+    }
+
+    const data = await response.json();
+    res.json({ ok: true, data });
+
+  } catch (err) {
+    logger.error('backend_compiler_proxy_error', { error: err.message });
+    res.status(500).json({
+      ok: false,
+      error: err.name === 'AbortError'
+        ? 'Compiler API timeout (8 seconds expired)'
+        : `Compiler Connection Failed: ${err.message}`
+    });
+  }
+});
+
+/**
  * GET /api/stats — server observability endpoint.
  */
 app.get('/api/stats', (_req, res) => {

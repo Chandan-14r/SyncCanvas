@@ -283,7 +283,7 @@ async function executeRemoteCompiler(code, language) {
       files: [{ name: getFileName(language), content: code }]
     };
 
-    const response = await fetch(PISTON_API_URL, {
+    const response = await fetch('/api/compile', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -293,10 +293,16 @@ async function executeRemoteCompiler(code, language) {
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      throw new Error(`Compiler API error status ${response.status}`);
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.error || `Compiler API error status ${response.status}`);
     }
 
-    const data = await response.json();
+    const resData = await response.json();
+    if (!resData.ok) {
+      throw new Error(resData.error || 'Compilation proxy failed');
+    }
+    
+    const data = resData.data;
     const runResult = data.run;
     const stdout = runResult.stdout || '';
     const stderr = runResult.stderr || '';
